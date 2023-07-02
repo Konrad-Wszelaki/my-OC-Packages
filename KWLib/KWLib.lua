@@ -130,6 +130,63 @@ function KWLIB.general.config.read(self, configFilePath)
     return configArray
 end
 
+-- handling of data files
+-- file format consists of key-data pairs
+-- keys are strings that act as indices in the loaded data table
+-- data is serialized and compressed, so it is also a string in the file
+-- thanks to this, the actual data can be anything from simple integers to large tables
+-- each line contains one key-data pair, with a cofigurable value separator between them (default: ';')
+KWLIB.general.dataFiles = {}
+-- constants
+KWLIB.general.dataFiles.FILE_EXTENSION  = ".dat"
+KWLIB.general.dataFiles.VALUE_SEPARATOR = ";"
+
+-- saving data files
+-- if a reference to a dataCard is not given as an argument, the data will not be compressed
+KWLIB.general.dataFiles.saveDataFile(self, path, dataArray, dataCard)
+    local dataFile, errMsg = io.open(path .. self.general.dataFiles.FILE_EXTENSION, "w")
+    if (dataFile == nil) then return false, errMsg end
+
+    for key, data in pairs(dataArray) do
+        data = serialization.serialize(data)
+        if type(dataCard) == "table" then
+            data = dataCard.deflate(data)
+        end
+        local a, b = dataFile.write(key .. self.general.dataFiles.VALUE_SEPARATOR .. data)
+        if (a == nil) then
+            return false, b
+        end
+    end
+
+    return true
+end
+
+-- reading data files
+-- if a reference to a dataCard is not given as an argument, the data is assumed to not be compressed
+-- if a reference to a dataCard is given as an argument, the data is assumed to be compressed
+KWLIB.general.dataFiles.readDataFile(self, path, dataCard)
+    local dataFile, errMsg = io.open(path .. self.general.dataFiles.FILE_EXTENSION)
+    if dataFile == nil then return false, errMsg end
+
+    local dataArray = {}
+    for line in dataFile:lines() do
+        -- split and clean-up the key and data
+        local substrings = self.strings.splitString(self, line, self.general.dataFiles.VALUE_SEPARATOR)
+        for index in ipairs(substrings) do
+            substrings[index] = string.gsub(substrings[index], self.general.dataFiles.VALUE_SEPARATOR, " ")
+            substrings[index] = text.trim(substrings[index])
+        end
+        -- add data to table
+        if type(dataCard) == "table" then
+            dataArray[substrings[1]] = serialization.unserialize(dataCard.inflate(substrings[2]))
+        else
+            dataArray[substrings[1]] = serialization.unserialize(substrings[2])
+        end
+    end
+
+    return dataArray
+end
+
 -- a simple function that maps the input from one range of values to another
 -- the value must be a number and ranges must be tables of two numbers indicating the beginning and the end of the range
 -- TODO: move to mathematical
@@ -156,7 +213,7 @@ end
 
 function KWLIB.general.lookForOccurenceInTable(table, object)
     for index, content in pairs(table) do
-        if content == object then return true end
+        if content == object then return true, index end
     end
     return false
 end
