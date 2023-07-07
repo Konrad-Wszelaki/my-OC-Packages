@@ -1091,6 +1091,8 @@ function GUI.createVerticalLayout(self, layoutID, x, y, w, h, borderStyle, numRo
     return newVerticalLayout
 end
 
+------------------------------------------------------------------------------------------
+
 function GUI.addObject(self, objectType, ...)
 
     if type(objectType) == "table" and objectType.type ~= nil then
