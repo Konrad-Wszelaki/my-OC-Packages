@@ -156,6 +156,7 @@ local function read_address_list()
     address_list["local"] = {["address"] = stargate.localAddress()}
 
     local saved_list = kwlib.general.dataFiles.readDataFile(kwlib, ADDRESS_BOOK_PATH, nil)
+    if not saved_list then return false end
     if saved_list["local"]["address"] ~= address_list["local"]["address"] then
         -- send updated address via a linked card
         saved_list["local"]["address"] = address_list["local"]["address"]
