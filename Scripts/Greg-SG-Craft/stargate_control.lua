@@ -67,12 +67,12 @@ local eventIrisStateChange      =   "sgIrisStateChange"
 local eventMessageReceived      =   "sgMessageReceived"
 -- stargate state safety (true if safe)
 local stargate_state_safety = {
-    ["Idle"]       = false,
-    ["Dialling"]   = false,
-    ["Opening"]    = false,
-    ["Connected"]  = true,
-    ["Closing"]    = false,
-    ["Offline"]    = false
+    "Idle"       = false,
+    "Dialling"   = false,
+    "Opening"    = false,
+    "Connected"  = true,
+    "Closing"    = false,
+    "Offline"    = false
 }
 -- initiated at config load
 local messageHandler --TODO: load message handler from separate file, since it will likely be different for each stargate
