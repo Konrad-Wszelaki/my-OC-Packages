@@ -152,7 +152,7 @@ function KWLIB.general.dataFiles.saveDataFile(self, path, dataArray, dataCard)
         if type(dataCard) == "table" then
             data = dataCard.deflate(data)
         end
-        local a, b = dataFile.write(key .. self.general.dataFiles.VALUE_SEPARATOR .. data)
+        local a, b = dataFile:write(key .. self.general.dataFiles.VALUE_SEPARATOR .. data .. self.general.dataFiles.VALUE_SEPARATOR .. "\n")
         if (a == nil) then
             return false, b
         end

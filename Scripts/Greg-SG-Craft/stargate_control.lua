@@ -153,13 +153,13 @@ end
 --      ...
 --  }
 local function read_address_list()
-    address_list["local"] = {["address"] = stargate.localAddress()}
+    address_list["local"] = stargate.localAddress()
 
     local saved_list = kwlib.general.dataFiles.readDataFile(kwlib, ADDRESS_BOOK_PATH, nil)
     if not saved_list then return false end
-    if saved_list["local"]["address"] ~= address_list["local"]["address"] then
-        -- send updated address via a linked card
-        saved_list["local"]["address"] = address_list["local"]["address"]
+    if saved_list["local"]["address"] ~= address_list["local"] then
+        send_updated_address()
+        saved_list["local"]["address"] = address_list["local"]
     end
     for name, data in pairs(saved_list) do
         address_list[name] = data["address"]
@@ -232,7 +232,7 @@ local function sendMessage(message)
     return "no connection"
 end
 
-local function setTargetAddress(address)
+local function setTargetAddress(gui, address)
     target_address = address
     return true
 end
@@ -245,7 +245,8 @@ end
 
 local function removeAddress(gui, name)
     if type(address_list[name]) == "string" then
-        table.remove(address_list, name)
+        address_list[name] = nil
+        write_address_list()
         return gui.removeObject(gui, "SelectListItem", address_book_selectlist_id, name)
     end
     return false
@@ -425,7 +426,7 @@ function popupWindow.create(gui, popupID, borderStyle, content)
     newPopupWindow.onKeyDown = popupWindowOnKeyDown
     newPopupWindow.last_clicked_object = nil
 
-    moveObject(newPopupWindow.content[1], newPopupWindow.x + 1 - newPopupWindow.content[1].x, newPopupWindow.y + 1 - newPopupWindow.content[1].y)
+    moveObject(gui, newPopupWindow.content[1], newPopupWindow.x + 1 - newPopupWindow.content[1].x, newPopupWindow.y + 1 - newPopupWindow.content[1].y)
     newPopupWindow.content[1].popupMaster = newPopupWindow.ID
     
     return gui.addObject(gui, "CustomPopupWindow", newPopupWindow)

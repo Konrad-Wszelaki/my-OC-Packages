@@ -680,7 +680,7 @@ function GUI.redraw(self)
             goto continue
         end
         if string.sub(self.objects[i].type, 1, 6) == "Custom" then
-            self.objects[i].onDraw(self.objects, i)
+            self.objects[i].onDraw(self, self.objects, i)
             goto continue
         end
         ::continue::
@@ -1353,7 +1353,7 @@ end
 
 function GUI.selectFromList(self, objects, ID, mouseY)
     local mouseListPos = mouseY - objects[ID].y
-    if mouseListPos >= 0 and mouseListPos < objects[ID].h then
+    if mouseListPos > 0 and mouseListPos < objects[ID].h then
         if objects[ID].scrollable then
 
             if ((objects[ID].borderStyle == "slim" or objects[ID].borderStyle == "thick") and mouseListPos == 1)
@@ -1416,7 +1416,7 @@ function GUI.clickOnCustom(self, objects, ID, ...)
         else
             objects[ID].focused = true
         end
-        return objects[ID].onClick(objects, ID, ...)
+        return objects[ID].onClick(self, objects, ID, ...)
     end
 
     return false
@@ -1533,7 +1533,7 @@ end
 function GUI.sendKeyDownToCustomObject(self, objects, ID, ...)
     if objects[ID] then
         if objects[ID].onKeyDown then
-            return objects[ID].onKeyDown(objects, ID, ...)
+            return objects[ID].onKeyDown(self, objects, ID, ...)
         end
     end
     return false
@@ -1616,6 +1616,11 @@ end
 
 function GUI.handleEvent(self, eventID, ...)
     if eventID == "redraw" then return true end
+    if eventID == "interrupted" then
+        self.running = false
+        redraw = true
+        return redraw
+    end
 
     local args = {...}
     local redraw = false
