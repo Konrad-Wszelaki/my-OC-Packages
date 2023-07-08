@@ -49,8 +49,8 @@ io.write("version compatible...\n")
 io.write("initializing constants, variables and tables: ")
 -- constants --
 local WIDTH, HEIGHT = gpu.getResolution()
-local ADDRESS_BOOK_PATH = "/usr/stargate_addresses"
-local CONFIG_FILE_PATH = "/usr/stargate_control_config"
+local ADDRESS_BOOK_PATH = "//usr/stargate_addresses"
+local CONFIG_FILE_PATH = "//usr/stargate_control_config"
 local LOCAL_NAME = nil
 
 local header_id = "header"
