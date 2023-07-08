@@ -1399,7 +1399,7 @@ end
 function GUI.pressButton(self, objects, ID, ...)
     if objects[ID].type == "Button" then
         if objects[ID].active == true then
-            return objects[ID].onClick(objects, ID, ...)
+            return objects[ID].onClick(self, objects, ID, ...)
         end
     end
     return false

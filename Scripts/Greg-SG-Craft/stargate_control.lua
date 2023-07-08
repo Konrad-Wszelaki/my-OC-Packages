@@ -309,7 +309,7 @@ local function drawPopupWindow(OBJECTS, ID)
 
     return false
 end
-local function popupWindowOnClick(OBJECTS, ID, ...)
+local function popupWindowOnClick(gui, OBJECTS, ID, ...)
     if OBJECTS[ID].content[1].onClick then
         if OBJECTS[ID].content[1].focused then
             if OBJECTS[ID].content[1].focused == false then
@@ -322,7 +322,7 @@ local function popupWindowOnClick(OBJECTS, ID, ...)
     end
     return false
 end
-local function popupWindowOnKeyDown(OBJECTS, ID, ...)
+local function popupWindowOnKeyDown(gui, OBJECTS, ID, ...)
     if OBJECTS[ID].content[1].onKeyDown then
         return OBJECTS[ID].content[1].onKeyDown(OBJECTS[ID].content, 1, ...)
     end
@@ -345,7 +345,7 @@ local function handleClick(masterObject, OBJECTS, ...)
         if OBJECTS[i].x and OBJECTS[i].y and OBJECTS[i].w and OBJECTS[i].h then
             if xPos >= OBJECTS[i].x and xPos < (OBJECTS[i].x + OBJECTS[i].w) and yPos >= OBJECTS[i].y and yPos < (OBJECTS[i].y + OBJECTS[i].h) then
                 if OBJECTS[i].onClick then
-                    if OBJECTS[i].onClick(OBJECTS, i, ...) == true then
+                    if OBJECTS[i].onClick(gui, OBJECTS, i, ...) == true then
                         masterObject.last_clicked_object = i
                         OBJECTS[i].focused = true
                         return true
@@ -382,10 +382,10 @@ local function drawObject(OBJECTS, ID)
     return true
 end
 
-local function simpleContainerOnClick(OBJECTS, ID, ...)
+local function simpleContainerOnClick(gui, OBJECTS, ID, ...)
     return handleClick(OBJECTS[ID], OBJECTS[ID].content, ...)
 end
-local function simpleContainerOnKeyDown(OBJECTS, ID, ...)
+local function simpleContainerOnKeyDown(gui, OBJECTS, ID, ...)
     if OBJECTS[ID].last_clicked_object then
         if OBJECTS[ID].content[last_clicked_object] then
             if OBJECTS[ID].content[last_clicked_object].onKeyDown then
