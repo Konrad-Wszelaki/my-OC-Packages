@@ -67,11 +67,11 @@ local eventIrisStateChange      =   "sgIrisStateChange"
 local eventMessageReceived      =   "sgMessageReceived"
 -- stargate state safety (true if safe)
 local stargate_state_safety = {
-    ["Idle"]       = false
-    ["Dialling"]   = false
-    ["Opening"]    = false
-    ["Connected"]  = true
-    ["Closing"]    = false
+    ["Idle"]       = false,
+    ["Dialling"]   = false,
+    ["Opening"]    = false,
+    ["Connected"]  = true,
+    ["Closing"]    = false,
     ["Offline"]    = false
 }
 -- initiated at config load
@@ -177,8 +177,8 @@ local function write_address_list()
     local data_to_save = {}
     for name, address in pairs(address_list) do
         data_to_save[name] = {
-            ["address"] = address 
-            ["blacklist"] = false
+            ["address"] = address,
+            ["blacklist"] = false,
             ["whitelist"] = false
         }
         if address_blacklist[address] == true then
