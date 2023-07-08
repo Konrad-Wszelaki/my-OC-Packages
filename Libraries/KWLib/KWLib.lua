@@ -143,7 +143,7 @@ KWLIB.general.dataFiles.VALUE_SEPARATOR = ";"
 
 -- saving data files
 -- if a reference to a dataCard is not given as an argument, the data will not be compressed
-KWLIB.general.dataFiles.saveDataFile(self, path, dataArray, dataCard)
+function KWLIB.general.dataFiles.saveDataFile(self, path, dataArray, dataCard)
     local dataFile, errMsg = io.open(path .. self.general.dataFiles.FILE_EXTENSION, "w")
     if (dataFile == nil) then return false, errMsg end
 
@@ -164,7 +164,7 @@ end
 -- reading data files
 -- if a reference to a dataCard is not given as an argument, the data is assumed to not be compressed
 -- if a reference to a dataCard is given as an argument, the data is assumed to be compressed
-KWLIB.general.dataFiles.readDataFile(self, path, dataCard)
+function KWLIB.general.dataFiles.readDataFile(self, path, dataCard)
     local dataFile, errMsg = io.open(path .. self.general.dataFiles.FILE_EXTENSION)
     if dataFile == nil then return false, errMsg end
 
