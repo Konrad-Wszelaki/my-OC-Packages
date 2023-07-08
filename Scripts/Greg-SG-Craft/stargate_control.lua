@@ -237,13 +237,13 @@ local function setTargetAddress(address)
     return true
 end
 
-local function addNewAddress(name, address)
+local function addNewAddress(gui, name, address)
     address_list[name] = address
     write_address_list()
     return gui.addItemToSelectList(gui, address_book_selectlist_id, name, name, setTargetAddress, address)
 end
 
-local function removeAddress(name)
+local function removeAddress(gui, name)
     if type(address_list[name]) == "string" then
         table.remove(address_list, name)
         return gui.removeObject(gui, "SelectListItem", address_book_selectlist_id, name)
@@ -251,39 +251,39 @@ local function removeAddress(name)
     return false
 end
 
-local function dialConfirmYes(popupID)
+local function dialConfirmYes(gui, popupID)
     gui.removeObject(gui, "CustomPopupWindow", popupID)
     return dial()
 end
 
-local function sendMessageConfirmYes(popupID, message)
+local function sendMessageConfirmYes(gui, popupID, message)
     gui.removeObject(gui, "CustomPopupWindow", popupID)
     return sendMessage(message)
 end
 
-local function addAddressConfirmYes(popupID, name_and_address)
+local function addAddressConfirmYes(gui, popupID, name_and_address)
     gui.removeObject(gui, "CustomPopupWindow", popupID)
-    return addNewAddress(name_and_address.name, name_and_address.address)
+    return addNewAddress(gui, name_and_address.name, name_and_address.address)
 end
 
-local function removeAddressConfirmYes(popupID, name)
+local function removeAddressConfirmYes(gui, popupID, name)
     gui.removeObject(gui, "CustomPopupWindow", popupID)
-    return removeAddress(name)
+    return removeAddress(gui, name)
 end
 
-local function closeConnectionConfirmYes(popupID)
+local function closeConnectionConfirmYes(gui, popupID)
     gui.removeObject(gui, "CustomPopupWindow", popupID)
     return closeConnection()
 end
 
 
-local function generalConfirmNo(popupID)
+local function generalConfirmNo(gui, popupID)
     gui.removeObject(gui, "CustomPopupWindow", popupID)
 end
 
 
 -- custom gui object functions
-local function moveObject(object, xTranslate, yTranslate)
+local function moveObject(gui, object, xTranslate, yTranslate)
     object.x = object.x + xTranslate
     object.y = object.y + yTranslate
     if object.content then
@@ -295,16 +295,16 @@ local function moveObject(object, xTranslate, yTranslate)
     return true
 end
 
-local function drawPopupWindow(OBJECTS, ID)
+local function drawPopupWindow(gui, OBJECTS, ID)
     gpu.setBackground(gui.colors.COLOR_general_bg)
     gpu.setForeground(gui.colors.COLOR_general_fg)
 
     if OBJECTS[ID].borderStyle == "slim" or OBJECTS[ID].borderStyle == "thick" then
-        gui.drawBorder(OBJECTS[ID].x, OBJECTS[ID].y, OBJECTS[ID].w, OBJECTS[ID].h, OBJECTS[ID].borderStyle)
+        gui.drawBorder(gui, OBJECTS[ID].x, OBJECTS[ID].y, OBJECTS[ID].w, OBJECTS[ID].h, OBJECTS[ID].borderStyle)
     end
 
     if OBJECTS[ID].content[1].onDraw then
-        return OBJECTS[ID].content[1].onDraw(OBJECTS[ID].content, 1)
+        return OBJECTS[ID].content[1].onDraw(gui, OBJECTS[ID].content, 1)
     end
 
     return false
@@ -318,18 +318,18 @@ local function popupWindowOnClick(gui, OBJECTS, ID, ...)
         else
             OBJECTS[ID].content[1].focused = true
         end
-        return OBJECTS[ID].content[1].onClick(OBJECTS[ID].content, 1, ...)
+        return OBJECTS[ID].content[1].onClick(gui, OBJECTS[ID].content, 1, ...)
     end
     return false
 end
 local function popupWindowOnKeyDown(gui, OBJECTS, ID, ...)
     if OBJECTS[ID].content[1].onKeyDown then
-        return OBJECTS[ID].content[1].onKeyDown(OBJECTS[ID].content, 1, ...)
+        return OBJECTS[ID].content[1].onKeyDown(gui, OBJECTS[ID].content, 1, ...)
     end
     return false
 end
 
-local function handleClick(masterObject, OBJECTS, ...)
+local function handleClick(gui, masterObject, OBJECTS, ...)
     local args = {...}
     local xPos = args[2]
     local yPos = args[3]
@@ -357,14 +357,14 @@ local function handleClick(masterObject, OBJECTS, ...)
     return false
 end
 
-local function drawSimpleContainer(container)
+local function drawSimpleContainer(gui, container)
     for i = 1, #container.content do
-        container.content[i].onDraw(container.content, i)
+        container.content[i].onDraw(gui, container.content, i)
     end
     return true
 end
 
-local function drawObject(OBJECTS, ID)
+local function drawObject(gui, OBJECTS, ID)
     for i = 1, #OBJECTS[ID].content do
         if OBJECTS[ID].content[i].type == "Label" then
             gui.drawLabel(gui, OBJECTS[ID].content, i)
@@ -376,20 +376,20 @@ local function drawObject(OBJECTS, ID)
             gui.drawOneLineTextField(gui, OBJECTS[ID].content, i)
         end
         if OBJECTS[ID].content[i].type == "ConfirmBox" then
-            OBJECTS[ID].content[i].onDraw(OBJECTS[ID].content, i)
+            OBJECTS[ID].content[i].onDraw(gui, OBJECTS[ID].content, i)
         end
     end
     return true
 end
 
 local function simpleContainerOnClick(gui, OBJECTS, ID, ...)
-    return handleClick(OBJECTS[ID], OBJECTS[ID].content, ...)
+    return handleClick(gui, OBJECTS[ID], OBJECTS[ID].content, ...)
 end
 local function simpleContainerOnKeyDown(gui, OBJECTS, ID, ...)
     if OBJECTS[ID].last_clicked_object then
         if OBJECTS[ID].content[last_clicked_object] then
             if OBJECTS[ID].content[last_clicked_object].onKeyDown then
-                return OBJECTS[ID].content[last_clicked_object].onKeyDown(OBJECTS[ID].content, last_clicked_object)
+                return OBJECTS[ID].content[last_clicked_object].onKeyDown(gui, OBJECTS[ID].content, last_clicked_object)
             end
         end
         if OBJECTS[ID].content[OBJECTS[ID].last_clicked_object].type == "OneLineTextField" then
@@ -399,14 +399,14 @@ local function simpleContainerOnKeyDown(gui, OBJECTS, ID, ...)
     return false
 end
 
-local function drawConfirmBox(OBJECTS, ID)
+local function drawConfirmBox(gui, OBJECTS, ID)
     gui.drawBorder(gui, OBJECTS[ID].x, OBJECTS[ID].y, OBJECTS[ID].w, OBJECTS[ID].h, 'slim')
-    return drawObject(OBJECTS, ID)
+    return drawObject(gui, OBJECTS, ID)
 end
 
 -- custom gui objects
 local popupWindow = {}
-function popupWindow.create(popupID, borderStyle, content)
+function popupWindow.create(gui, popupID, borderStyle, content)
     local newPopupWindow = {}
 
     newPopupWindow.type = "CustomPopupWindow"
@@ -454,7 +454,7 @@ function simpleContainer.create(containerID, x, y)
     return newSimpleContainer
 end
 
-function simpleContainer.recalculateContainerBoundary(container)
+function simpleContainer.recalculateContainerBoundary(gui, container)
     local xmin = WIDTH
     local ymin = HEIGHT
     local xmax = 1
@@ -472,22 +472,22 @@ function simpleContainer.recalculateContainerBoundary(container)
     return true
 end
 
-function simpleContainer.addItemToContainer(container, item)
+function simpleContainer.addItemToContainer(gui, container, item)
     table.insert(container.content, item)
-    return simpleContainer.recalculateContainerBoundary(container)
+    return simpleContainer.recalculateContainerBoundary(gui, container)
 end
-function simpleContainer.removeItemFromContainer(container, itemID)
+function simpleContainer.removeItemFromContainer(gui, container, itemID)
     for i = #container.content, 1, -1 do
         if container.content[i].ID == itemID then
             table.remove(container.content, i)
-            return simpleContainer.recalculateContainerBoundary(container)
+            return simpleContainer.recalculateContainerBoundary(gui, container)
         end
     end
     return false
 end
 
 local confirmBox = {}
-function confirmBox.create(popupMaster, confirmBoxID, yesCallback, yesCallbackArgument, noCallback, noCallbackArgument, x, y, ...)
+function confirmBox.create(gui, popupMaster, confirmBoxID, yesCallback, yesCallbackArgument, noCallback, noCallbackArgument, x, y, ...)
     local args = {...}
 
     local newConfirmBox = {}
@@ -506,11 +506,11 @@ function confirmBox.create(popupMaster, confirmBoxID, yesCallback, yesCallbackAr
     newConfirmBox.onDraw = drawConfirmBox
 
     function newConfirmBox.yesCallback()
-        yesCallback(newConfirmBox.popupMaster, yesCallbackArgument)
+        yesCallback(gui, newConfirmBox.popupMaster, yesCallbackArgument)
         return true
     end
     function newConfirmBox.noCallback()
-        noCallback(newConfirmBox.popupMaster, noCallbackArgument)
+        noCallback(gui, newConfirmBox.popupMaster, noCallbackArgument)
         return true
     end
 
@@ -537,7 +537,7 @@ function confirmBox.create(popupMaster, confirmBoxID, yesCallback, yesCallbackAr
 end
 
 local addNewAddressBox = {}
-function addNewAddressBox.create(newAddressBoxID, x, y)
+function addNewAddressBox.create(gui, newAddressBoxID, x, y)
     local newAddNewAddressBox = {}
 
     newAddNewAddressBox.type = "AddNewAddressBox"
@@ -559,6 +559,7 @@ function addNewAddressBox.create(newAddressBoxID, x, y)
         local name = gui.getTextFromOneLineTextField(gui, newAddNewAddressBox.content, newAddressBoxID .. "NameField")
         local address = gui.getTextFromOneLineTextField(gui, newAddNewAddressBox.content, newAddressBoxID .. "AddressField")
         local confirmAdd = confirmBox.create(
+            gui, 
             newAddNewAddressBox.popupMaster,
             newAddNewAddressBox.ID .. "ConfirmAddBox",
             addAddressConfirmYes,
@@ -571,10 +572,10 @@ function addNewAddressBox.create(newAddressBoxID, x, y)
             "name: " .. name,
             "address: " .. address
         )
-        return popupWindow.create("ConfirmAddAddressPopupID", "thick", confirmAdd)
+        return popupWindow.create(gui, "ConfirmAddAddressPopupID", "thick", confirmAdd)
     end
     function newAddNewAddressBox.onCancel()
-        generalConfirmNo(newAddNewAddressBox.popupMaster)
+        generalConfirmNo(gui, newAddNewAddressBox.popupMaster)
         return true
     end
 
@@ -600,7 +601,7 @@ function addNewAddressBox.create(newAddressBoxID, x, y)
 end
 
 local removeAddressBox = {}
-function removeAddressBox.create(removeAddressBoxID, x, y)
+function removeAddressBox.create(gui, removeAddressBoxID, x, y)
     local newRemoveAddressBox = {}
 
     newRemoveAddressBox.type = "RemoveAddressBox"
@@ -621,6 +622,7 @@ function removeAddressBox.create(removeAddressBoxID, x, y)
     function newRemoveAddressBox.onRemove()
         local name = gui.getTextFromOneLineTextField(gui, newRemoveAddressBox.content, removeAddressBoxID .. "NameField")
         local confirmRemove = confirmBox.create(
+            gui, 
             newRemoveAddressBox.popupMaster,
             newRemoveAddressBox.ID .. "ConfirmRemoveBox",
             removeAddressConfirmYes,
@@ -632,10 +634,10 @@ function removeAddressBox.create(removeAddressBoxID, x, y)
             "Remove address?",
             "name: " .. name
         )
-        return popupWindow.create("ConfirmAddAddressPopupID", "thick", confirmRemove)
+        return popupWindow.create(gui, "ConfirmAddAddressPopupID", "thick", confirmRemove)
     end
     function newRemoveAddressBox.onCancel()
-        generalConfirmNo(newRemoveAddressBox.popupMaster)
+        generalConfirmNo(gui, newRemoveAddressBox.popupMaster)
         return true
     end
 
@@ -655,17 +657,18 @@ function removeAddressBox.create(removeAddressBoxID, x, y)
 end
 
 local function addNewAddressButtonCallback(...)
-    local newAddressBox = addNewAddressBox.create("NewAddressBoxID", 1, 1)
-    return popupWindow.create("NewAddressBoxPopupID", "thick", newAddressBox)
+    local newAddressBox = addNewAddressBox.create(gui, "NewAddressBoxID", 1, 1)
+    return popupWindow.create(gui, "NewAddressBoxPopupID", "thick", newAddressBox)
 end
 
 local function removeAddressButtonCallback(...)
-    local removeAddressBox = removeAddressBox.create("RemoveAddressBoxID", 1, 1)
-    return popupWindow.create("RemoveAddressBoxPopupID", "thick", removeAddressBox)
+    local removeAddressBox = removeAddressBox.create(gui, "RemoveAddressBoxID", 1, 1)
+    return popupWindow.create(gui, "RemoveAddressBoxPopupID", "thick", removeAddressBox)
 end
 
 local function dialButtonCallback(...)
     local dialConfirmBox = confirmBox.create(
+        gui, 
         nil,
         "DialConfirmBoxID",
         dialConfirmYes,
@@ -677,11 +680,12 @@ local function dialButtonCallback(...)
         "Dial with",
         target_address
     )
-    return popupWindow.create("DialConfirmBoxPopupID", "thick", dialConfirmBox)
+    return popupWindow.create(gui, "DialConfirmBoxPopupID", "thick", dialConfirmBox)
 end
 
 local function closeConnectionButtonCallback(...)
     local closeConnectionConfirmBox = confirmBox.create(
+        gui, 
         nil,
         "CloseConnectionConfirmBoxID",
         closeConnectionConfirmYes,
@@ -692,7 +696,7 @@ local function closeConnectionButtonCallback(...)
         1,
         "Close Connection?"
     )
-    return popupWindow.create("CloseConnectionConfirmBoxPopupID", "thick", closeConnectionConfirmBox)
+    return popupWindow.create(gui, "CloseConnectionConfirmBoxPopupID", "thick", closeConnectionConfirmBox)
 end
 
 -- Event handler callbacks
