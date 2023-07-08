@@ -346,13 +346,7 @@ local function handleClick(masterObject, OBJECTS, ...)
                 if OBJECTS[i].onClick then
                     if OBJECTS[i].onClick(OBJECTS, i, ...) == true then
                         masterObject.last_clicked_object = i
-                        if OBJECTS[i].focused then
-                            if OBJECTS[i].focused == false then
-                                OBJECTS[i].focused = true
-                            end
-                        else
-                            OBJECTS[i].focused = true
-                        end
+                        OBJECTS[i].focused = true
                         return true
                     end
                 end
