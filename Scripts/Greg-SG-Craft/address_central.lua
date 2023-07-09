@@ -15,7 +15,7 @@ local run = true
 
 local function handleLocalNetworkMessage(localAddress, remoteAddress, port, distance, serializedPacket, ...)
     if type(serializedPacket) ~= "string" or port ~= NETWORK_COMMS_PORT then return false end
-    local data = serialization.unserialize(serializedPacket)
+    --local data = serialization.unserialize(serializedPacket)
     --print("Local message: ")
     --print(data)
     for key, datum in pairs(data) do
@@ -28,7 +28,7 @@ end
 
 local function handlePairedCardMessage(localAddress, remoteAddress, port, distance, serializedPacket, ...)
     if type(serializedPacket) ~= "string" then return false end
-    local data = serialization.unserialize(serializedPacket)
+    --local data = serialization.unserialize(serializedPacket)
     --print("Paired Card message: ")
     --print(data)
     for key, datum in pairs(data) do
