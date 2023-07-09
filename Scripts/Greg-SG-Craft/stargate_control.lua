@@ -120,9 +120,11 @@ local function send_updated_address()
     linked_card.send(serialization.serialize({[LOCAL_NAME] = stargate.localAddress()}))
 end
 local function check_current_address()
-    if address_list["local"] == stargate.localAddress() then return nil end
+    -- checking disabled, since I think it will be better if we actually send the current address every time, 1 message every 5 minutes is not that much traffic...
+    --if address_list["local"] == stargate.localAddress() then return nil end
     address_list["local"] = stargate.localAddress()
     send_updated_address()
+    return gui.changeItemInSelectList(gui, address_book_selectlist_id, "local", "local", setTargetAddress, address_list["local"])
 end
 
 -- read from / write to address list
