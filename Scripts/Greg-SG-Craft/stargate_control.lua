@@ -124,15 +124,6 @@ local function check_current_address()
     address_list["local"] = stargate.localAddress()
     send_updated_address()
 end
-local function update_remote_address(remoteName, remoteAddres)
-    -- check if the address is known and send our own address as a hello if it is new
-    if address_list[remoteName] == nil then
-        send_updated_address()
-        return addNewAddress(remoteName, remoteAddress)
-    end
-    address_list[remoteName] = remoteAddress
-    return gui.changeItemInSelectList(gui, address_book_selectlist_id, remoteName, remoteName, setTargetAddress, remoteAddress)
-end
 
 -- read from / write to address list
 -- list file and table format:
@@ -299,6 +290,8 @@ end
 local function drawPopupWindow(gui, OBJECTS, ID)
     gpu.setBackground(gui.colors.COLOR_general_bg)
     gpu.setForeground(gui.colors.COLOR_general_fg)
+
+    gui.clearArea(gui, OBJECTS[ID].x, OBJECTS[ID].y, OBJECTS[ID].w, OBJECTS[ID].h)
 
     if OBJECTS[ID].borderStyle == "slim" or OBJECTS[ID].borderStyle == "thick" then
         gui.drawBorder(gui, OBJECTS[ID].x, OBJECTS[ID].y, OBJECTS[ID].w, OBJECTS[ID].h, OBJECTS[ID].borderStyle)
@@ -746,8 +739,18 @@ local function sgMessageReceivedCallback(sourceStargateID, ...)
     return true
 end
 
-local function lkMessageReceivedCallback(localAddress, remoteAddress, port, distance, serialized_data, ...)
-    if localAddress ~= linked_card.getChannel() then return false end
+local function update_remote_address(remoteName, remoteAddress)
+    -- check if the address is known and send our own address as a hello if it is new
+    if address_list[remoteName] == nil then
+        send_updated_address()
+        return addNewAddress(gui, remoteName, remoteAddress)
+    end
+    address_list[remoteName] = remoteAddress
+    return gui.changeItemInSelectList(gui, address_book_selectlist_id, remoteName, remoteName, setTargetAddress, remoteAddress)
+end
+
+local function lkMessageReceivedCallback(eventID, localAddress, remoteAddress, port, distance, serialized_data, ...)
+    if localAddress ~= linked_card.address then return false end
     local data = serialization.unserialize(serialized_data)
     for name, address in pairs(data) do
         update_remote_address(name, address)
@@ -778,6 +781,10 @@ local function initializeGUI()
     if loadConfig() then
         io.write("Success!\n")
     end
+
+    -- say hello on the network
+    send_updated_address()
+    io.write("hello network!")
 
     print("Reading address book...")
     read_address_list()
