@@ -5,6 +5,8 @@ local component     = require("component")
 local io            = require("io")
 local serialization = require("serialization")
 local event         = require("event")
+local thread        = require("thread")
+local computer      = require("computer")
 
 local gpu = component.gpu
 if type(gpu) ~= "table" then
@@ -84,7 +86,14 @@ local name_list = {} -- inverse of the address list
 local stargate_door_locked = false
 local stargate_last_state = nil
 local address_update_timer = nil
-local ADDRESS_UPDATE_TIMER_PERIOD = 300 --time in seconds between address updates
+local ADDRESS_UPDATE_TIMER_PERIOD = 300 -- time in seconds between address updates
+local DATAFILE_SAVE_TIMER_PERIOD  = 60  -- time in seconds between savefile saves
+
+local running = true
+local stargateAddressUpdateThread = nil
+local saveDataFileThread = nil
+local saveRequested = false
+
 
 -- whitelist and blacklist
 local address_blacklist = {}
@@ -232,14 +241,16 @@ end
 
 local function addNewAddress(gui, name, address)
     address_list[name] = address
-    write_address_list()
+    --write_address_list()
+    saveRequested = true
     return gui.addItemToSelectList(gui, address_book_selectlist_id, name, name, setTargetAddress, address)
 end
 
 local function removeAddress(gui, name)
     if type(address_list[name]) == "string" then
         address_list[name] = nil
-        write_address_list()
+        --write_address_list()
+        saveRequested = true
         return gui.removeObject(gui, "SelectListItem", address_book_selectlist_id, name)
     end
     return false
@@ -774,7 +785,28 @@ local function loadConfig()
 
     ADDRESS_UPDATE_TIMER_PERIOD = configTable["updateTimerPeriod"].value
 
+    DATAFILE_SAVE_TIMER_PERIOD = configTable["saveDataFilePeriod"].value
+
     return true
+end
+
+local function sendCurrentStargateAddressThreadFunc()
+    while running do
+        if math.fmod(computer.uptime(), ADDRESS_UPDATE_TIMER_PERIOD) == 0 then
+            check_current_address()
+        end
+        os.sleep(1)
+    end
+end
+
+local function saveDataFileThreadFunc()
+    while running do
+        if (math.fmod(computer.uptime(), DATAFILE_SAVE_TIMER_PERIOD) == 0) or (saveRequested == true) then
+            write_address_list()
+            saveRequested = false
+        end
+        os.sleep(1)
+    end
 end
 
 -- init functions
@@ -832,9 +864,9 @@ local function initializeGUI()
     -- linked card (and modem) messages
     gui.registerEventHandler(gui, "modem_message", lkMessageReceivedCallback)
 
-
-    -- timer that will periodically check our current stargate address and send it if it changed
-    address_update_timer = event.timer(ADDRESS_UPDATE_TIMER_PERIOD, check_current_address, math.huge)
+    -- create savefile and address update threads
+    stargateAddressUpdateThread = thread.create(sendCurrentStargateAddressThreadFunc)
+    saveDataFileThread          = thread.create(saveDataFileThreadFunc)
 
     print("done")
     return true
@@ -846,5 +878,12 @@ print("Initializing the system")
 print("\n")
 initializeGUI()
 gui.run(gui)
--- disable the timer after the gui quits
-if address_update_timer ~= nil then event.cancel(address_update_timer) end
+
+-- tell the threads to stop and wait for them to quit
+running = false
+if stargateAddressUpdateThread ~= nil then 
+    if not stargateAddressUpdateThread:join(5) then stargateAddressUpdateThread:kill() end
+end
+if saveDataFileThread ~= nil then
+    if not saveDataFileThread:join(5) then saveDataFileThread:kill() end
+end
