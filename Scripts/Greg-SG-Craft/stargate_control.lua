@@ -91,7 +91,9 @@ local DATAFILE_SAVE_TIMER_PERIOD  = 60  -- time in seconds between savefile save
 
 local running = true
 local stargateAddressUpdateThread = nil
+local lastAddressUpdateTime = 0
 local saveDataFileThread = nil
+local lastDataSaveTime = 0
 local saveRequested = false
 
 
@@ -792,8 +794,9 @@ end
 
 local function sendCurrentStargateAddressThreadFunc()
     while running do
-        if math.fmod(computer.uptime(), ADDRESS_UPDATE_TIMER_PERIOD) == 0 then
+        if lastAddressUpdateTime + ADDRESS_UPDATE_TIMER_PERIOD < computer.uptime() then
             check_current_address()
+            lastAddressUpdateTime = computer.uptime()
         end
         os.sleep(1)
     end
@@ -801,9 +804,10 @@ end
 
 local function saveDataFileThreadFunc()
     while running do
-        if (math.fmod(computer.uptime(), DATAFILE_SAVE_TIMER_PERIOD) == 0) or (saveRequested == true) then
+        if lastDataSaveTime + DATAFILE_SAVE_TIMER_PERIOD < computer.uptime() or saveRequested then
             write_address_list()
             saveRequested = false
+            lastDataSaveTime = computer.uptime()
         end
         os.sleep(1)
     end
