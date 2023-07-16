@@ -760,6 +760,10 @@ local function update_remote_address(remoteName, remoteAddress)
         send_updated_address()
         return addNewAddress(gui, remoteName, remoteAddress)
     end
+
+    if address_list[remoteName] == remoteAddress then return false end
+    
+    send_updated_address()
     address_list[remoteName] = remoteAddress
     return gui.changeItemInSelectList(gui, address_book_selectlist_id, remoteName, remoteName, setTargetAddress, remoteAddress)
 end
