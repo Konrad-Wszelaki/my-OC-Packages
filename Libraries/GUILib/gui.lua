@@ -744,7 +744,6 @@ function GUI.addItemToSelectList(self, listID, itemID, itemContent, itemCallback
 end
 
 function GUI.changeItemInSelectList(self, listID, itemID, newItemContent, newCallback, newCallbackArguments)
-    if newItem == nil then return false end
     for i = 1, #self.objects do
         if self.objects[i].type == "SelectList" then
             if self.objects[i].ID == listID then
