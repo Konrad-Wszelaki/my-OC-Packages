@@ -17,10 +17,10 @@ local kwlib         = require("KWLib")
 -- actual library starts here
 local GUI = {}
 GUI.VERSION_MAJOR = "2"
-GUI.VERSION_MINOR = "0"
+GUI.VERSION_MINOR = "1"
 
 GUI.KWLIB_VERSION_MAJOR = "2"
-GUI.KWLIB_VERSION_MINOR = "0"
+GUI.KWLIB_VERSION_MINOR = "1"
 -- check if the KWLIB version is compatible with this library
 if kwlib:checkVersionCompat(GUI.KWLIB_VERSION_MAJOR, GUI.KWLIB_VERSION_MINOR) == false then
     error("KWLIB version is incompatible with the GUI library, cannot proceed...")
@@ -38,6 +38,7 @@ GUI.focusedCustomObjectID = nil
 GUI.redrawOnTick = true
 GUI.ticksPerRedraw = 1
 GUI.ticksSinceRedraw = 0
+GUI.tickRate = 2
 
 -- define all the colors
 GUI.colors = {
@@ -242,6 +243,10 @@ function GUI.clearArea(self, x, y, w, h)
     gpu.fill(x, y, w, h, " ")
 end
 
+function GUI.checkIfWithinObjectBoundary(self, xPos, yPos, object)
+    return xPos >= object.x and xPos < (object.x + object.w) and yPos >= object.y and yPos < (object.y + object.h)
+end
+
 function GUI.drawSelectList(self, objects, ID)
     if objects[ID].visible == true then
         gpu.setBackground(self.colors.COLOR_general_bg)
@@ -326,14 +331,25 @@ function GUI.drawText(self, objects, ID)
     local outputText = objects[ID].value
 
     self:clearArea(x, y, w, h)
-    if string.len(outputText) > w then
-        local excess_len_left_side = math.floor((string.len(outputText) - w)/2)
-        local excess_len_right_side = math.ceil((string.len(outputText) - w)/2)
-        outputText = string.sub(outputText, excess_len_left_side, string.len(outputText) - excess_len_right_side)
+    if type(outputText) ~= "table" then
+        if string.len(outputText) > w then
+            local excess_len_left_side = math.floor((string.len(outputText) - w)/2)
+            local excess_len_right_side = math.ceil((string.len(outputText) - w)/2)
+            outputText = string.sub(outputText, excess_len_left_side, string.len(outputText) - excess_len_right_side)
+        end
+        gpu.set(x + math.floor((w-string.len(outputText))/2), y, outputText)
+    else
+        for i, substring in pairs(outputText) do
+            gpu.set(x, y + i - 1, substring)
+        end
     end
-    gpu.set(x + math.floor((w-string.len(outputText))/2), y, outputText)
 
     return true
+end
+
+function GUI.drawInfoBox(self, objects, ID)
+    local result = self:drawText(objects, ID)
+    return self:drawButton(objects[ID].content, objects[ID].content.ID) and result
 end
 
 function GUI.drawButton(self, objects, ID)
@@ -647,6 +663,31 @@ function GUI.drawAutoScrollableDisplayList(self, objects, ID)
     return false
 end
 
+function GUI.drawSymbolArray(self, objects, ID)
+    if objects[ID].visible == false then
+        return false
+    end
+
+    local FGColor, BGColor = self.colors.COLOR_general_fg, self.colors.COLOR_general_bg
+    gpu.setForeground(FGColor)
+    gpu.setBackground(BGColor)
+
+    local x, y, w, h = self:drawBorderAndGetDimensions(objects, ID)
+
+    self:clearArea(x, y, w, h)
+
+    -- concatenate each row together and then write to the screen to save gpu time
+    for i, row in ipairs(objects[ID].array) do
+        local line = ""
+        for j, symbol in ipairs(objects[ID].array[i]) do
+            line = line .. objects[ID].array[i][j]
+        end
+        gpu.set(x, y + i - 1, line)
+    end
+
+    return true
+end
+
 function GUI.redraw(self)
     self:clearScreen()
 
@@ -677,6 +718,10 @@ function GUI.redraw(self)
         end
         if self.objects[i].type == "AutoScrollableDisplayList" then
             self:drawAutoScrollableDisplayList(self.objects, i)
+            goto continue
+        end
+        if self.objects[i].type == "SymbolArray" then
+            self:drawSymbolArray(self.objects, i)
             goto continue
         end
         if string.sub(self.objects[i].type, 1, 6) == "Custom" then
@@ -1049,6 +1094,71 @@ function GUI.changeItemContentsInAutoScrollableDisplayList(self, listID, itemID,
     return false
 end
 
+function GUI.createInfoBox(self, infoBoxID, borderStyle, title, text)
+    local newInfoBox = {}
+    newInfoBox.type = "InfoBox"
+    newInfoBox.visible = true
+    newInfoBox.ID = infoBoxID
+
+    -- figure out the space we need
+    -- first, width, set to 2/3 of the screen width, the text length or minimum width needed for an OK button, whichever is smaller
+    newInfoBox.w = math.min(math.floor(self.width * (2/3)), text:len() + ((borderStyle=="slim" or borderStyle=="thick") and 2 or 0), 4 + ((borderStyle=="slim" or borderStyle=="thick") and 2 or 0))
+    -- then we split the string into smaller strings that fit the width
+    newInfoBox.value = kwlib.strings.splitStringIntoLines(kwlib, text, w - ((borderStyle=="slim" or borderStyle=="thick") and 2 or 0))
+    -- and set height depending on how many strings we end up with + height needed for the OK button
+    newInfoBox.h = ((borderStyle=="slim" or borderStyle=="thick") and 2 or 0) + kwlib.tables.countEntries(kwlib, newInfoBox.value) + 3
+    -- set x position to center the box
+    newInfoBox.x = math.floor((self.WIDTH - newInfoBox.w)/2)
+    -- set y position to center the box
+    newInfoBox.y = math.floor((self.HEIGHT - newInfoBox.h)/2)
+    newInfoBox.borderStyle = borderStyle
+    newInfoBox.title = title
+    newInfoBox.content = {}
+
+    function newInfoBox.ack(infoBoxContent, buttonID, gui, objects, ID)
+        return gui:removeObject("InfoBox", ID)
+    end
+
+    local tempObject = self.createButton(infoBoxID .. "ACK", "OK", newInfoBox.ack, math.floor(newInfoBox.x + (newInfoBox.w / 2) - 2), newInfoBox.y + newInfoBox.h - 3 - ((borderStyle=="slim" or borderStyle=="thick") and 1 or 0), 4, 3, "slim")
+    table.insert(newInfoBox.content, tempObject)
+
+    return newInfoBox
+end
+
+function GUI.createSymbolArray(self, symbolArrayID, xPos, yPos, width, height)
+    local newSymbolArray = {}
+
+    newSymbolArray.type = "SymbolArray"
+    newSymbolArray.visible = true
+    newSymbolArray.ID = symbolArrayID
+    newSymbolArray.x = xPos
+    newSymbolArray.y = yPos
+    newSymbolArray.w = width
+    newSymbolArray.h = height
+    newSymbolArray.borderStyle = "none"
+    newSymbolArray.array = {}
+    for i=1, height, 1 do
+        newSymbolArray.array[i] = {}
+        for j=1, width, 1 do
+            newSymbolArray.array[i][j] = " "
+        end
+    end
+    
+    return newSymbolArray
+end
+
+function GUI.setSymbolInSymbolArray(self, objects, symbolArrayID, xPos, yPos, symbol)
+    for i=#objects, 1, -1 do
+        if objects[i].type == "SymbolArray" and objects[i].ID == symbolArrayID then
+            if type(objects[i].array[yPos]) == "table" and type(objects[i].array[yPos][xPos]) == "string" then
+                objects[i].array[yPos][xPos] = symbol
+                return true
+            end
+        end
+    end
+    return false
+end
+
 ------------------------------------------------------------------------------------------
 -- layouts
 function GUI.createVerticalLayout(self, layoutID, x, y, w, h, borderStyle, numRows, rowHeightTable, hAlign, vAlign, fitObjectsToSize, bordersBetweenRows)
@@ -1127,6 +1237,14 @@ function GUI.addObject(self, objectType, ...)
         table.insert(self.objects, self:createAutoScrollableDisplayList(...))
         return true
     end
+    if objectType == "InfoBox" then
+        table.insert(self.objects, self:createInfoBox(...))
+        return true
+    end
+    if objectType == "SymbolArray" then
+        table.insert(self.objects, self:createSymbolArray(...))
+        return true
+    end
     if string.sub(objectType, 1, 6) == "Custom" then
         table.insert(self.objects, ...)
         return true
@@ -1136,6 +1254,7 @@ function GUI.addObject(self, objectType, ...)
 end
 
 function GUI.popObject(self)
+    if self.objects[#self.objects].onDelete then self.objects[#self.objects].onDelete(self, self.objects[#self.objects]) end
     table.remove(self.objects)
     return true
 end
@@ -1144,6 +1263,7 @@ function GUI.removeSelectList(self, listID)
     for i=#self.objects, 1, -1 do
         if self.objects[i].type == "SelectList" then
             if self.objects[i].ID == listID then
+                if self.objects[i].onDelete then self.objects[i].onDelete(self, self.objects[i]) end
                 table.remove(self.objects, i)
                 return true
             end
@@ -1216,6 +1336,7 @@ function GUI.removeOneLineTextField(self, textID)
     for i=#self.objects, 1, -1 do
         if self.objects[i].type == "OneLineTextField" then
             if self.objects[i].ID == textID then
+                if self.objects[i].onDelete then self.objects[i].onDelete(self, self.objects[i]) end
                 table.remove(self.objects, i)
                 return true
             end
@@ -1228,6 +1349,7 @@ function GUI.removeButton(self, buttonID)
     for i=#self.objects, 1, -1 do
         if self.objects[i].type == "Button" then
             if self.objects[i].ID == buttonID then
+                if self.objects[i].onDelete then self.objects[i].onDelete(self, self.objects[i]) end
                 table.remove(self.objects, i)
                 return true
             end
@@ -1240,6 +1362,7 @@ function GUI.removeCustomObject(self, objectType, objectID)
     for i=#self.objects, 1, -1 do
         if self.objects[i].type == objectType then
             if self.objects[i].ID == objectID then
+                if self.objects[i].onDelete then self.objects[i].onDelete(self, self.objects[i]) end
                 table.remove(self.objects, i)
                 return true
             end
@@ -1252,6 +1375,7 @@ function GUI.removeLabel(self, labelID)
     for i=#self.objects, 1, -1 do
         if self.objects[i].type == "Label" then
             if self.objects[i].ID == labelID then
+                if self.objects[i].onDelete then self.objects[i].onDelete(self, self.objects[i]) end
                 table.remove(self.objects, i)
                 return true
             end
@@ -1264,6 +1388,7 @@ function GUI.removeBarGraph(self, barGraphID)
     for i=#self.objects, 1, -1 do
         if self.objects[i].type == "BarGraph" then
             if self.objects[i].ID == barGraphID then
+                if self.objects[i].onDelete then self.objects[i].onDelete(self, self.objects[i]) end
                 table.remove(self.objects, i)
                 return true
             end
@@ -1276,6 +1401,7 @@ function GUI.removePixelArt(self, pixelArtID)
     for i=#self.objects, 1, -1 do
         if self.objects[i].type == "PixelArt" then
             if self.objects[i].ID == pixelArtID then
+                if self.objects[i].onDelete then self.objects[i].onDelete(self, self.objects[i]) end
                 table.remove(self.objects, i)
                 return true
             end
@@ -1288,6 +1414,7 @@ function GUI.removeAutoScrollableDisplayList(self, autoScrollableDisplayListID)
     for i=#self.objects, 1, -1 do
         if self.objects[i].type == "AutoScrollableDisplayList" then
             if self.objects[i].ID == autoScrollableDisplayListID then
+                if self.objects[i].onDelete then self.objects[i].onDelete(self, self.objects[i]) end
                 table.remove(self.objects, i)
                 return true
             end
@@ -1302,6 +1429,7 @@ function GUI.removeFromAutoScrollableDisplayList(self, autoScrollableDisplayList
             if self.objects[i].ID == autoScrollableDisplayListID then
                 for j=#self.objects[i].objects, 1, -1 do
                     if self.objects[i].objects[j].ID == itemID then
+                        if self.objects[i].objects[j].onDelete then self.objects[i].objects[j].onDelete(self, self.objects[i].objects[j]) end
                         table.remove(self.objects[i].objects, j)
                         if self.objects[i].elementBorderStyle == 'thick' or self.objects[i].elementBorderStyle == 'slim' then
                             self.objects[i].totalHeight = self.objects[i].totalHeight - 3 
@@ -1311,6 +1439,32 @@ function GUI.removeFromAutoScrollableDisplayList(self, autoScrollableDisplayList
                         return true
                     end
                 end
+            end
+        end
+    end
+    return false
+end
+
+function GUI.removeInfoBox(self, infoBoxID)
+    for i=#self.objects, 1, -1 do
+        if self.objects[i].type == "InfoBox" then
+            if self.objects[i].ID == infoBoxID then
+                if self.objects[i].onDelete then self.objects[i].onDelete(self, self.objects[i]) end
+                table.remove(self.objects, i)
+                return true
+            end
+        end
+    end
+    return false
+end
+
+function GUI.removeSymbolArray(self, symbolArrayID)
+    for i=#self.objects, 1, -1 do
+        if self.objects[i].type == "SymbolArray" then
+            if self.objects[i].ID == symbolArrayID then
+                if self.objects[i].onDelete then self.objects[i].onDelete(self, self.objects[i]) end
+                table.remove(self.objects, i)
+                return true
             end
         end
     end
@@ -1342,6 +1496,12 @@ function GUI.removeObject(self, objectType, ...)
     end
     if objectType == "AutoScrollableDisplayList" then
         return self:removeAutoScrollableDisplayList(...)
+    end
+    if objectType == "InfoBox" then
+        return self:removeInfoBox(...)
+    end
+    if objectType == "SymbolArray" then
+        return self:removeSymbolArray(...)
     end
     if string.sub(objectType, 1, 6) == "Custom" then
         return self:removeCustomObject(objectType, ...)
@@ -1376,12 +1536,14 @@ function GUI.selectFromList(self, objects, ID, mouseY)
             end
 
             local selected_item = objects[ID].position + (mouseListPos - 1)
-            objects[ID].selected_item = selected_item
-            return objects[ID].items[selected_item]:callback(objects[ID].items[selected_item].callbackArguments)
+            if objects[ID].items[mouseListPos].callback and objects[ID].items[selected_item]:callback(objects[ID].items[selected_item].callbackArguments) then
+                objects[ID].selected_item = selected_item
+                return true
+            end
         elseif mouseListPos <= #objects[ID].items then
-            if objects[ID].items[mouseListPos].callback then
+            if objects[ID].items[mouseListPos].callback and objects[ID].items[mouseListPos]:callback(objects[ID].items[mouseListPos].callbackArguments) then
                 objects[ID].selected_item = mouseListPos
-                return objects[ID].items[mouseListPos]:callback(objects[ID].items[mouseListPos].callbackArguments)
+                return true
             end
         end
     end
@@ -1400,6 +1562,17 @@ function GUI.pressButton(self, objects, ID, ...)
         if objects[ID].active == true then
             return objects[ID].onClick(self, objects, ID, ...)
         end
+    end
+    return false
+end
+
+function GUI.clickOnInfoBox(self, objects, ID, ...)
+    local args = {...}
+    local xPos = args[2]
+    local yPos = args[3]
+
+    if self:checkIfWithinObjectBoundary(xPos, yPos, objects[ID].content[1]) then
+        return self:pressButton(objects[ID], ID .. "ACK", self, objects, ID)
     end
     return false
 end
@@ -1540,11 +1713,22 @@ end
 
 -- function to register custom event handlers
 -- the callback function should return 'true' if it requires the screen to be redrawn or 'false' if it does not
-function GUI.registerEventHandler(self, eventID, callback)
+function GUI.registerEventHandler(self, eventID, callback, handlerID)
     local newEventHandler = {}
     newEventHandler.eventID = eventID
     newEventHandler.callback = callback
-    table.insert(self.eventHandlers, newEventHandler)
+    if handlerID ~= nil then
+        if self.eventHandlers[handlerID] == nil then
+            self.eventHandlers[handlerID] = newEventHandler
+        else return false end
+    else
+        table.insert(self.eventHandlers, newEventHandler)
+    end
+    return true
+end
+
+function GUI.removeEventHandler(self, handlerID)
+    self.eventHandlers[handlerID] = nil
     return true
 end
 
@@ -1569,7 +1753,7 @@ function GUI.handleClick(self, ...)
 
     for i = #self.objects,1, -1 do
         if self.objects[i].x and self.objects[i].y and self.objects[i].w and self.objects[i].h then
-            if xPos >= self.objects[i].x and xPos < (self.objects[i].x + self.objects[i].w) and yPos >= self.objects[i].y and yPos < (self.objects[i].y + self.objects[i].h) then
+            if self:checkIfWithinObjectBoundary(xPos, yPos, self.objects[i]) then
                 self.lastObjectPressed = i
                 if self.objects[i].type == "SelectList" then
                     if self:selectFromList(self.objects, i, yPos) == true then
@@ -1583,6 +1767,11 @@ function GUI.handleClick(self, ...)
                 end
                 if self.objects[i].type == "Button" then
                     if self:pressButton(self.objects, i, ...) == true then
+                        return true
+                    end
+                end
+                if self.objects[i].type == "InfoBox" then
+                    if self:clickOnInfoBox(self.objects, i, ...) == true then
                         return true
                     end
                 end
@@ -1609,7 +1798,7 @@ function GUI.tickObjects(self)
             self.ticksSinceRedraw = 0
         end
         if self.redrawOnTick == true then self.ticksSinceRedraw = self.ticksSinceRedraw + 1 end
-        os.sleep(0.5)
+        os.sleep(1.0 / self.tickRate)
     end
 end
 
@@ -1633,9 +1822,9 @@ function GUI.handleEvent(self, eventID, ...)
         self.lastObjectPressed = nil
     end
 
-    for i = 1, #self.eventHandlers do
-        if self.eventHandlers[i].eventID == eventID then
-            redraw = self.eventHandlers[i].callback(eventID, ...) or redraw
+    for handlerID, handler in pairs(self.eventHandlers) do
+        if handler.eventID == eventID then
+            redraw = handler.callback(eventID, ...) or redraw
         end
     end
 

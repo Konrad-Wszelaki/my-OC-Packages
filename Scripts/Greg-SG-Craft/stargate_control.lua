@@ -1,5 +1,5 @@
 local version_major = "1"
-local version_minor = "0"
+local version_minor = "1"
 
 local component     = require("component")
 local io            = require("io")
@@ -30,7 +30,7 @@ end
 
 local gui = require("gui")
 local GUI_VERSION_MAJOR = "2"
-local GUI_VERSION_MINOR = "0"
+local GUI_VERSION_MINOR = "1"
 io.write("checking GUI version compat: ")
 if not gui.checkVersionCompat(gui, GUI_VERSION_MAJOR, GUI_VERSION_MINOR) then
     error("GUI library version incompatible, cannot proceed...")
@@ -39,7 +39,7 @@ io.write("version compatible...\n")
 
 local kwlib = require("KWLib")
 local KWLIB_VERSION_MAJOR = "2"
-local KWLIB_VERSION_MINOR = "0"
+local KWLIB_VERSION_MINOR = "1"
 io.write("checking KWLib version compat: ")
 if not kwlib.checkVersionCompat(kwlib, KWLIB_VERSION_MAJOR, KWLIB_VERSION_MINOR) then
     error("KWLib library version incompatible, cannot proceed...")
@@ -54,6 +54,9 @@ local WIDTH, HEIGHT = gpu.getResolution()
 local ADDRESS_BOOK_PATH = "//usr/stargate_addresses"
 local CONFIG_FILE_PATH = "//usr/stargate_control_config"
 local LOCAL_NAME = nil
+-- custom gui object names
+local CUSTOM_POPUP_WINDOW       = "CustomPopupWindow"
+local CUSTOM_SIMPLE_CONTAINER   = "CustomSimpleContainer"
 
 local header_id = "header"
 local address_book_selectlist_id = "address_book"
@@ -81,6 +84,7 @@ local messageHandler --TODO: load message handler from separate file, since it w
 
 -- variables
 local target_address = stargate.localAddress()
+local address_locked = false
 local address_list = {}
 local name_list = {} -- inverse of the address list
 local stargate_door_locked = false
@@ -204,12 +208,20 @@ local function dial()
             if ok then
                 return nil
             else
+                gui:addObject("InfoBox", "DialFailedInfo", "slim", "DIAL FAILED", result)
                 return result
             end
         end
+        gui:addObject("InfoBox", "DialFailedInfo", "slim", "DIAL FAILED", "no target selected")
         return "no target selected"
     end
+    gui:addObject("InfoBox", "DialFailedInfo", "slim", "DIAL FAILED", "stargate not idle")
     return "stargate not idle"
+end
+
+local function onDroppedConnection()
+    address_locked = false
+    return gui:removeObject(CUSTOM_POPUP_WINDOW, "dialingInfoBoxPopupID")
 end
 
 local function closeConnection()
@@ -218,9 +230,11 @@ local function closeConnection()
         if ok then
             return nil
         else
+            gui:addObject("InfoBox", "closeConnectionFailedInfo", "slim", "CANNOT CLOSE", result)
             return result
         end
     end
+    gui:addObject("InfoBox", "closeConnectionFailedInfo", "slim", "CANNOT CLOSE", "No connection or already closing")
     return "No connection or already closing"
 end
 
@@ -230,15 +244,21 @@ local function sendMessage(message)
         if ok then
             return nil
         else
+            gui:addObject("InfoBox", "messageNotSentInfo", "slim", "MESSAGE NOT SENT", result)
             return result
         end
     end
+    gui:addObject("InfoBox", "messageNotSentInfo", "slim", "MESSAGE NOT SENT", "no connection")
     return "no connection"
 end
 
 local function setTargetAddress(gui, address)
-    target_address = address
-    return true
+    if not address_locked then
+        target_address = address
+        return true
+    else 
+        return false
+    end
 end
 
 local function addNewAddress(gui, name, address)
@@ -259,33 +279,33 @@ local function removeAddress(gui, name)
 end
 
 local function dialConfirmYes(gui, popupID)
-    gui.removeObject(gui, "CustomPopupWindow", popupID)
+    gui.removeObject(gui, CUSTOM_POPUP_WINDOW, popupID)
     return dial()
 end
 
 local function sendMessageConfirmYes(gui, popupID, message)
-    gui.removeObject(gui, "CustomPopupWindow", popupID)
+    gui.removeObject(gui, CUSTOM_POPUP_WINDOW, popupID)
     return sendMessage(message)
 end
 
 local function addAddressConfirmYes(gui, popupID, name_and_address)
-    gui.removeObject(gui, "CustomPopupWindow", popupID)
+    gui.removeObject(gui, CUSTOM_POPUP_WINDOW, popupID)
     return addNewAddress(gui, name_and_address.name, name_and_address.address)
 end
 
 local function removeAddressConfirmYes(gui, popupID, name)
-    gui.removeObject(gui, "CustomPopupWindow", popupID)
+    gui.removeObject(gui, CUSTOM_POPUP_WINDOW, popupID)
     return removeAddress(gui, name)
 end
 
 local function closeConnectionConfirmYes(gui, popupID)
-    gui.removeObject(gui, "CustomPopupWindow", popupID)
+    gui.removeObject(gui, CUSTOM_POPUP_WINDOW, popupID)
     return closeConnection()
 end
 
 
 local function generalConfirmNo(gui, popupID)
-    gui.removeObject(gui, "CustomPopupWindow", popupID)
+    gui.removeObject(gui, CUSTOM_POPUP_WINDOW, popupID)
 end
 
 
@@ -415,13 +435,14 @@ end
 
 -- custom gui objects
 local popupWindow = {}
-function popupWindow.create(gui, popupID, borderStyle, content)
+function popupWindow.create(gui, popupID, borderStyle, content, title)
     local newPopupWindow = {}
 
-    newPopupWindow.type = "CustomPopupWindow"
+    newPopupWindow.type = CUSTOM_POPUP_WINDOW
     newPopupWindow.ID = popupID
     newPopupWindow.content = {content}
     newPopupWindow.borderStyle = borderStyle
+    newPopupWindow.title = title
 
     newPopupWindow.visible = true
     newPopupWindow.w = newPopupWindow.content[1].w + 2
@@ -434,17 +455,25 @@ function popupWindow.create(gui, popupID, borderStyle, content)
     newPopupWindow.onKeyDown = popupWindowOnKeyDown
     newPopupWindow.last_clicked_object = nil
 
+    newPopupWindow.onDelete = function(gui, self)
+        for i, object in pairs(self.content) do
+            if type(object.onDelete) == "function" then
+                object.onDelete(gui, object)
+            end
+        end
+    end
+
     moveObject(gui, newPopupWindow.content[1], newPopupWindow.x + 1 - newPopupWindow.content[1].x, newPopupWindow.y + 1 - newPopupWindow.content[1].y)
     newPopupWindow.content[1].popupMaster = newPopupWindow.ID
     
-    return gui.addObject(gui, "CustomPopupWindow", newPopupWindow)
+    return gui.addObject(gui, CUSTOM_POPUP_WINDOW, newPopupWindow)
 end
 
 local simpleContainer = {}
 function simpleContainer.create(containerID, x, y)
     local newSimpleContainer = {}
 
-    newSimpleContainer.type = "CustomSimpleContainer"
+    newSimpleContainer.type = CUSTOM_SIMPLE_CONTAINER
     newSimpleContainer.ID = containerID
     
     newSimpleContainer.content = {}
@@ -526,7 +555,7 @@ function confirmBox.create(gui, popupMaster, confirmBoxID, yesCallback, yesCallb
     for i = 1, #args do
         newConfirmBox.h = newConfirmBox.h + 1
         if string.len(args[i]) > newConfirmBox.w then
-            newConfirmBox.w = string.len(args[i]) + 2
+            newConfirmBox.w = string.len(args[i]) + 4
         end
     end
 
@@ -620,16 +649,17 @@ function removeAddressBox.create(gui, removeAddressBoxID, x, y)
     newRemoveAddressBox.content = {}
     newRemoveAddressBox.last_clicked_object = nil
     newRemoveAddressBox.focused = false
+    newRemoveAddressBox.targetAddress = target_address
     newRemoveAddressBox.x = x
     newRemoveAddressBox.y = y
-    newRemoveAddressBox.w = 28
+    newRemoveAddressBox.w = (name_list[newRemoveAddressBox.targetAddress]:len() < 18) and 28 or (name_list[newRemoveAddressBox.targetAddress]:len() + 10)
     newRemoveAddressBox.h = 4
     newRemoveAddressBox.popupMaster = nil
     newRemoveAddressBox.onDraw = drawObject
     newRemoveAddressBox.onKeyDown = simpleContainerOnKeyDown
 
     function newRemoveAddressBox.onRemove()
-        local name = gui.getTextFromOneLineTextField(gui, newRemoveAddressBox.content, removeAddressBoxID .. "NameField")
+        local name = name_list[newRemoveAddressBox.targetAddress]
         local confirmRemove = confirmBox.create(
             gui, 
             newRemoveAddressBox.popupMaster,
@@ -653,29 +683,32 @@ function removeAddressBox.create(gui, removeAddressBoxID, x, y)
     local tempObject = gui.createLabel(gui, removeAddressBoxID .. "NameLabel", "Name:", x+1, y+1, 8, 1, "none")
     table.insert(newRemoveAddressBox.content, tempObject)
 
-    local tempObject = gui.createOneLineTextField(gui, removeAddressBoxID .. "NameField", "-NAME-", x+9, y+1, 12, 1)
+    local tempObject = gui.createLabel(gui, removeAddressBoxID .. "NameField", name_list[newRemoveAddressBox.targetAddress], x+9, y+1, name_list[newRemoveAddressBox.targetAddress]:len() - 10, 1, "none")
     table.insert(newRemoveAddressBox.content, tempObject)
     
-    local tempObject = gui.createButton(gui, removeAddressBoxID .. "ConfirmButton", "REMOVE", newRemoveAddressBox.onRemove, x+21, y+1, 6, 1, "none")
+    local tempObject = gui.createButton(gui, removeAddressBoxID .. "ConfirmButton", "REMOVE", newRemoveAddressBox.onRemove, x+1, y+2, 6, 1, "none")
     table.insert(newRemoveAddressBox.content, tempObject)
     
-    local tempObject = gui.createButton(gui, removeAddressBoxID .. "CancelButton", "CANCEL", newRemoveAddressBox.onCancel, x+21, y+2, 6, 1, "none")
+    local tempObject = gui.createButton(gui, removeAddressBoxID .. "CancelButton", "CANCEL", newRemoveAddressBox.onCancel, x+newRemoveAddressBox.w-7, y+2, 6, 1, "none")
     table.insert(newRemoveAddressBox.content, tempObject)
 
     return newRemoveAddressBox
 end
 
 local function addNewAddressButtonCallback(...)
+    if address_locked then return false end
     local newAddressBox = addNewAddressBox.create(gui, "NewAddressBoxID", 1, 1)
     return popupWindow.create(gui, "NewAddressBoxPopupID", "thick", newAddressBox)
 end
 
 local function removeAddressButtonCallback(...)
+    if address_locked then return false end
     local removeAddressBox = removeAddressBox.create(gui, "RemoveAddressBoxID", 1, 1)
     return popupWindow.create(gui, "RemoveAddressBoxPopupID", "thick", removeAddressBox)
 end
 
 local function dialButtonCallback(...)
+    if address_locked then return false end
     local dialConfirmBox = confirmBox.create(
         gui, 
         nil,
@@ -708,20 +741,104 @@ local function closeConnectionButtonCallback(...)
     return popupWindow.create(gui, "CloseConnectionConfirmBoxPopupID", "thick", closeConnectionConfirmBox)
 end
 
+function dialingInfoBox.create()
+    local newDialingInfoBox = {}
+    -- ╔╣CONNECTION╠╗
+    -- ║    name    ║
+    -- ║  address   ║
+    -- ║  chevr*__  ║
+    -- ║  █████▄__  ║
+    -- ║ DISCONNECT ║
+    -- ╚════════════╝
+
+    newDialingInfoBox.type = "DialingInfoBox"
+    newDialingInfoBox.ID = "DialingInfoBox"
+    newDialingInfoBox.visible = true
+    newDialingInfoBox.onClick = simpleContainerOnClick
+    newDialingInfoBox.content = {}
+    newDialingInfoBox.focused = false
+    newDialingInfoBox.x = 1
+    newDialingInfoBox.y = 1
+    newDialingInfoBox.w = 14
+    newDialingInfoBox.h = 5
+    newDialingInfoBox.popupMaster = nil
+    newDialingInfoBox.onDraw = drawObject
+    newDialingInfoBox.chevronEventHandlerID = newDialingInfoBox.ID .. "ChevronEventHandler"
+
+    newDialingInfoBox.onDelete = function(gui, self)
+        gui:removeEventHandler(self.chevronEventHandlerID)
+        return true
+    end
+
+    function newDialingInfoBox.onChevron(eventID, sourceStargateID, chevronNumber, symbol)
+        gui:setSymbolInSymbolArray(newDialingInfoBox.content, newDialingInfoBox.ID .. "Chevrons", chevronNumber, 1, symbol)
+        gui:setSymbolInSymbolArray(newDialingInfoBox.content, newDialingInfoBox.ID .. "Progress", chevronNumber, 1, gui.symbols.SYM_full_block)
+        if chevronNumber < target_address:len() then
+            gui:setSymbolInSymbolArray(newDialingInfoBox.content, newDialingInfoBox.ID .. "Chevrons", chevronNumber+1, 1, gui.symbols.SYM_caret)
+            gui:setSymbolInSymbolArray(newDialingInfoBox.content, newDialingInfoBox.ID .. "Progress", chevronNumber+1, 1, gui.symbols.SYM_lower_block)
+        end
+        return true
+    end
+    
+    local x, address_name = findNameByAddress(target_address)
+    if address_name:len()   > newDialingInfoBox.w then newDialingInfoBox.w = address_name:len()     end
+    if target_address:len() > newDialingInfoBox.w then newDialingInfoBox.w = target_address:len()   end
+
+    -- content:
+    -- name label
+    local tempObject = gui:createLabel(newDialingInfoBox.ID .. "Name", address_name, math.floor(newDialingInfoBox.w-address_name:len())/2, 1, address_name:len(), 1, "none")
+    table.insert(newDialingInfoBox.content, tempObject)
+    -- address label
+    local tempObject = gui:createLabel(newDialingInfoBox.ID .. "Address", target_address, math.floor(newDialingInfoBox.w-target_address:len())/2, 2, target_address:len(), 1, "none")
+    table.insert(newDialingInfoBox.content, tempObject)
+    -- chevrons custom field
+    local tempObject = gui:createSymbolArray(newDialingInfoBox.ID .. "Chevrons", math.floor(newDialingInfoBox.w-target_address:len())/2, 3, target_address:len(), 1)
+    table.insert(newDialingInfoBox.content, tempObject)
+    -- progress custom field
+    local tempObject = gui:createSymbolArray(newDialingInfoBox.ID .. "Progress", math.floor(newDialingInfoBox.w-target_address:len())/2, 4, target_address:len(), 1)
+    table.insert(newDialingInfoBox.content, tempObject)
+    -- disconnect button
+    local tempObject = gui:createButton(newDialingInfoBox.ID .. "Disconnect", "DISCONNECT", closeConnectionButtonCallback, math.floor(newDialingInfoBox.w/2)-5, 5, 10, 1, "none")
+    table.insert(newDialingInfoBox.content, tempObject)
+
+    -- chevron and progress field init
+    for i = 1, target_address:len(), 1 do
+        gui:setSymbolInSymbolArray(newDialingInfoBox.content, newDialingInfoBox.ID .. "Chevrons", i, 1, "_")
+        gui:setSymbolInSymbolArray(newDialingInfoBox.content, newDialingInfoBox.ID .. "Progress", i, 1, "_")
+    end
+    gui:setSymbolInSymbolArray(newDialingInfoBox.content, newDialingInfoBox.ID .. "Progress", 1, 1, gui.symbols.SYM_lower_block)
+
+    gui:registerEventHandler(eventChevronEngaged, newDialingInfoBox.onChevron, newDialingInfoBox.chevronEventHandlerID)
+
+    return newDialingInfoBox
+end
+
+-- on succesful beginning of dial
+local function dialSuccessfullCallback(localStargateID, remoteStargateID)
+    local newDialingInfoBox = dialingInfoBox.create()
+    return popupWindow.create("dialingInfoBoxPopupID", "thick", newDialingInfoBox)
+end
+
 -- Event handler callbacks
 local function sgDialInCallback(sourceStargateID, connectingStargateAddress)
     -- TODO: check if blacklist or whitelist are enabled and enforce them
-    return true
+    -- if blacklist/whitelist passed then
+    address_locked = false
+    setTargetAddress(connectingStargateAddress)
+    address_locked = true
+    return dialSuccessfullCallback(sourceStargateID, connectingStargateAddress)
+    -- else
+    -- disconnect
+    -- return false
 end
 
 local function sgDialOutCallback(sourceStargateID, connectingStargateAddress)
     -- TODO: check if blacklist or whitelist are enabled and enforce them
-    return true
-end
-
-local function sgChevronEngagedCallback(sourceStargateID, chevronNumber, symbol)
-    -- TODO: make a fun information display that shows the symbols being engaged
-    return true
+    -- if blacklist/whitelist passed then
+    return dialSuccessfullCallback(sourceStargateID, connectingStargateAddress)
+    -- else
+    -- disconnect
+    -- return false
 end
 
 local function sgStargateStateChangeCallback(sourceStargateID, newState, oldState)
@@ -730,6 +847,8 @@ local function sgStargateStateChangeCallback(sourceStargateID, newState, oldStat
     else
         close_stargate_door()
     end
+    if newState ~= "Idle" then address_locked = true else address_locked = false end
+    if oldState == "Connected" then onDroppedConnection() end
     stargate_last_state = newState
     return true
 end
@@ -853,7 +972,7 @@ local function initializeGUI()
     gui.addObject(gui, "Button", "AddNewAddressButton", "ADD ADDRESS", addNewAddressButtonCallback, 2, HEIGHT-1, 11, 1, "none")
     -- dial selected
     gui.addObject(gui, "Button", "DialButton", "DIAL WITH SELECTED", dialButtonCallback, (WIDTH/2) - 9, HEIGHT-1, 18, 1, "none")
-    -- remove existing address
+    -- remove selected address
     gui.addObject(gui, "Button", "RemoveAddressButton", "REMOVE ADDRESS", removeAddressButtonCallback, WIDTH - 15, HEIGHT-1, 14, 1, "none")
     -- send message
     -- ... TODO
@@ -864,7 +983,6 @@ local function initializeGUI()
     -- stargate events
     gui.registerEventHandler(gui, eventStargateDialInbound   , sgDialInCallback              )
     gui.registerEventHandler(gui, eventStargateDialOutbound  , sgDialOutCallback             )
-    gui.registerEventHandler(gui, eventChevronEngaged        , sgChevronEngagedCallback      )
     gui.registerEventHandler(gui, eventStargateStateChange   , sgStargateStateChangeCallback )
     gui.registerEventHandler(gui, eventIrisStateChange       , sgIrisStateChangeCallback     )
     gui.registerEventHandler(gui, eventMessageReceived       , sgMessageReceivedCallback     )

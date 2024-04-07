@@ -10,7 +10,7 @@ local KWLIB = {}
 -- do not use kwlib.general:createCircularBuffer(...), because then kwlib.general will be put into self instead of kwlib itself
 
 KWLIB.VERSION_MAJOR = "2"
-KWLIB.VERSION_MINOR = "0"
+KWLIB.VERSION_MINOR = "1"
 
 function KWLIB.version(self)
     return self.VERSION_MAJOR .. "." .. self.VERSION_MINOR
@@ -232,6 +232,31 @@ function KWLIB.strings.splitString(self, stringToSplit, delimiter)
     return substrings
 end
 
+-- function to split a given string to multiple strings with a given maximum width
+-- will only move complete words
+-- gives up if a word is too long for the given width (TODO: handle this in a better way)
+function KWLIB.strings.splitStringIntoLines(self, stringToSplit, maxWidth)
+    local substrings = {}
+    if stringToSplit:len() <= maxWidth then
+        substrings:insert(stringToSplit)
+        return substrings
+    end
+    local index = maxWidth
+    local lastIndex = 1
+    while index <= string.len(stringToSplit)  do
+        while stringToSplit:sub(index, index) ~= " " do index = index - 1 end
+        if index < lastIndex then return false end
+        substrings:insert(stringToSplit:sub(lastIndex, index))
+        lastIndex = index + 1
+        index = index + maxWidth
+    end
+
+    if index > stringToSplit:len() then substrings:insert(stringToSplit:sub(lastIndex, stringToSplit:len()))
+
+    return substrings
+end
+
+
 ------------------------------------------------------------------------------------------------
 -- directional
 KWLIB.directional = {}
@@ -328,6 +353,19 @@ function KWLIB.networking.sendOneMessageToMultipleAddresses(self, modem, address
         modem.send(addressTable[i], portTable[i], ...)
     end
     return true
+end
+
+------------------------------------------------------------------------------------------------
+-- tables
+KWLIB.tables = {}
+
+function KWLIB.tables.countEntries(self, array)
+    if type(array) ~= "table" then return false end
+    local count = 0
+    for a, b in pairs(table) do
+        count = count + 1
+    end
+    return count
 end
 
 return KWLIB
