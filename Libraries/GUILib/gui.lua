@@ -349,7 +349,7 @@ end
 
 function GUI.drawInfoBox(self, objects, ID)
     local result = self:drawText(objects, ID)
-    return self:drawButton(objects[ID].content, objects[ID].content.ID) and result
+    return self:drawButton(objects[ID].content, 1) and result
 end
 
 function GUI.drawButton(self, objects, ID)
@@ -722,6 +722,10 @@ function GUI.redraw(self)
         end
         if self.objects[i].type == "SymbolArray" then
             self:drawSymbolArray(self.objects, i)
+            goto continue
+        end
+        if self.objects[i].type == "InfoBox" then
+            self:drawInfoBox(self.objects, i)
             goto continue
         end
         if string.sub(self.objects[i].type, 1, 6) == "Custom" then
@@ -1101,10 +1105,10 @@ function GUI.createInfoBox(self, infoBoxID, borderStyle, title, text)
     newInfoBox.ID = infoBoxID
 
     -- figure out the space we need
-    -- first, width, set to 2/3 of the screen width, the text length or minimum width needed for an OK button, whichever is smaller
-    newInfoBox.w = math.min(math.floor(self.width * (2/3)), text:len() + ((borderStyle=="slim" or borderStyle=="thick") and 2 or 0), 4 + ((borderStyle=="slim" or borderStyle=="thick") and 2 or 0))
+    -- first, width, set to 2/3 of the screen width or the text length, whichever is smaller
+    newInfoBox.w = math.min(math.floor(self.WIDTH * (2/3)), text:len() + ((borderStyle=="slim" or borderStyle=="thick") and 2 or 0))
     -- then we split the string into smaller strings that fit the width
-    newInfoBox.value = kwlib.strings.splitStringIntoLines(kwlib, text, w - ((borderStyle=="slim" or borderStyle=="thick") and 2 or 0))
+    newInfoBox.value = kwlib.strings.splitStringIntoLines(kwlib, text, newInfoBox.w - ((borderStyle=="slim" or borderStyle=="thick") and 2 or 0))
     -- and set height depending on how many strings we end up with + height needed for the OK button
     newInfoBox.h = ((borderStyle=="slim" or borderStyle=="thick") and 2 or 0) + kwlib.tables.countEntries(kwlib, newInfoBox.value) + 3
     -- set x position to center the box
@@ -1115,11 +1119,11 @@ function GUI.createInfoBox(self, infoBoxID, borderStyle, title, text)
     newInfoBox.title = title
     newInfoBox.content = {}
 
-    function newInfoBox.ack(infoBoxContent, buttonID, gui, objects, ID)
-        return gui:removeObject("InfoBox", ID)
+    function newInfoBox.ack(gui, objects, ID)
+        return self:removeObject("InfoBox", ID)
     end
 
-    local tempObject = self.createButton(infoBoxID .. "ACK", "OK", newInfoBox.ack, math.floor(newInfoBox.x + (newInfoBox.w / 2) - 2), newInfoBox.y + newInfoBox.h - 3 - ((borderStyle=="slim" or borderStyle=="thick") and 1 or 0), 4, 3, "slim")
+    local tempObject = self:createButton(infoBoxID .. "ACK", "OK", newInfoBox.ack, math.floor(newInfoBox.x + (newInfoBox.w / 2) - 2), newInfoBox.y + newInfoBox.h - 3 - ((borderStyle=="slim" or borderStyle=="thick") and 1 or 0), 4, 3, "slim")
     table.insert(newInfoBox.content, tempObject)
 
     return newInfoBox
@@ -1572,7 +1576,7 @@ function GUI.clickOnInfoBox(self, objects, ID, ...)
     local yPos = args[3]
 
     if self:checkIfWithinObjectBoundary(xPos, yPos, objects[ID].content[1]) then
-        return self:pressButton(objects[ID], ID .. "ACK", self, objects, ID)
+        return self:pressButton(objects[ID].content, 1, self, objects, objects[ID].ID)
     end
     return false
 end

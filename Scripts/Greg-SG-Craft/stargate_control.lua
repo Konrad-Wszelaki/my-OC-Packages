@@ -228,7 +228,7 @@ local function closeConnection()
     if stargate.stargateState() ~= "Idle" and stargate.stargateState() ~= "Closing" then
         local ok, result = pcall(stargate.disconnect)
         if ok then
-            return nil
+            return onDroppedConnection()
         else
             gui:addObject("InfoBox", "closeConnectionFailedInfo", "slim", "CANNOT CLOSE", result)
             return result
@@ -263,6 +263,7 @@ end
 
 local function addNewAddress(gui, name, address)
     address_list[name] = address
+    name_list[address] = name
     --write_address_list()
     saveRequested = true
     return gui.addItemToSelectList(gui, address_book_selectlist_id, name, name, setTargetAddress, address)
@@ -403,6 +404,9 @@ local function drawObject(gui, OBJECTS, ID)
         end
         if OBJECTS[ID].content[i].type == "OneLineTextField" then
             gui.drawOneLineTextField(gui, OBJECTS[ID].content, i)
+        end
+        if OBJECTS[ID].content[i].type == "SymbolArray" then
+            gui.drawSymbolArray(gui, OBJECTS[ID].content, i)
         end
         if OBJECTS[ID].content[i].type == "ConfirmBox" then
             OBJECTS[ID].content[i].onDraw(gui, OBJECTS[ID].content, i)
@@ -683,7 +687,7 @@ function removeAddressBox.create(gui, removeAddressBoxID, x, y)
     local tempObject = gui.createLabel(gui, removeAddressBoxID .. "NameLabel", "Name:", x+1, y+1, 8, 1, "none")
     table.insert(newRemoveAddressBox.content, tempObject)
 
-    local tempObject = gui.createLabel(gui, removeAddressBoxID .. "NameField", name_list[newRemoveAddressBox.targetAddress], x+9, y+1, name_list[newRemoveAddressBox.targetAddress]:len() - 10, 1, "none")
+    local tempObject = gui.createLabel(gui, removeAddressBoxID .. "NameField", name_list[newRemoveAddressBox.targetAddress], x+9, y+1, name_list[newRemoveAddressBox.targetAddress]:len(), 1, "none")
     table.insert(newRemoveAddressBox.content, tempObject)
     
     local tempObject = gui.createButton(gui, removeAddressBoxID .. "ConfirmButton", "REMOVE", newRemoveAddressBox.onRemove, x+1, y+2, 6, 1, "none")
@@ -741,6 +745,8 @@ local function closeConnectionButtonCallback(...)
     return popupWindow.create(gui, "CloseConnectionConfirmBoxPopupID", "thick", closeConnectionConfirmBox)
 end
 
+local dialingInfoBox = {}
+
 function dialingInfoBox.create()
     local newDialingInfoBox = {}
     -- ╔╣CONNECTION╠╗
@@ -780,7 +786,7 @@ function dialingInfoBox.create()
         return true
     end
     
-    local x, address_name = findNameByAddress(target_address)
+    local address_name = name_list[target_address]
     if address_name:len()   > newDialingInfoBox.w then newDialingInfoBox.w = address_name:len()     end
     if target_address:len() > newDialingInfoBox.w then newDialingInfoBox.w = target_address:len()   end
 
@@ -816,11 +822,11 @@ end
 -- on succesful beginning of dial
 local function dialSuccessfullCallback(localStargateID, remoteStargateID)
     local newDialingInfoBox = dialingInfoBox.create()
-    return popupWindow.create("dialingInfoBoxPopupID", "thick", newDialingInfoBox)
+    return popupWindow.create(gui, "dialingInfoBoxPopupID", "thick", newDialingInfoBox)
 end
 
 -- Event handler callbacks
-local function sgDialInCallback(sourceStargateID, connectingStargateAddress)
+local function sgDialInCallback(eventID, sourceStargateID, connectingStargateAddress)
     -- TODO: check if blacklist or whitelist are enabled and enforce them
     -- if blacklist/whitelist passed then
     address_locked = false
@@ -832,7 +838,7 @@ local function sgDialInCallback(sourceStargateID, connectingStargateAddress)
     -- return false
 end
 
-local function sgDialOutCallback(sourceStargateID, connectingStargateAddress)
+local function sgDialOutCallback(eventID, sourceStargateID, connectingStargateAddress)
     -- TODO: check if blacklist or whitelist are enabled and enforce them
     -- if blacklist/whitelist passed then
     return dialSuccessfullCallback(sourceStargateID, connectingStargateAddress)
@@ -841,19 +847,19 @@ local function sgDialOutCallback(sourceStargateID, connectingStargateAddress)
     -- return false
 end
 
-local function sgStargateStateChangeCallback(sourceStargateID, newState, oldState)
+local function sgStargateStateChangeCallback(eventID, sourceStargateID, newState, oldState)
     if stargate_state_safety[newState] == true then
         if not stargate_door_locked then open_stargate_door() end
     else
         close_stargate_door()
     end
-    if newState ~= "Idle" then address_locked = true else address_locked = false end
-    if oldState == "Connected" then onDroppedConnection() end
+    if newState == "Idle" then address_locked = false else address_locked = true end
+    if oldState == "Connected" and newState ~= "Connected" then onDroppedConnection() end
     stargate_last_state = newState
     return true
 end
 
-local function sgIrisStateChangeCallback(sourceStargateID, newState, oldState)
+local function sgIrisStateChangeCallback(eventID, sourceStargateID, newState, oldState)
     if newState == "Open" or newState == "Offline" then
         stargate_door_locked = false
         if stargate_state_safety[stargate_last_state] == true then
@@ -866,7 +872,7 @@ local function sgIrisStateChangeCallback(sourceStargateID, newState, oldState)
     return true
 end
 
-local function sgMessageReceivedCallback(sourceStargateID, ...)
+local function sgMessageReceivedCallback(eventID, sourceStargateID, ...)
     local messageContent = {...}
     -- TODO: read the messages and act depending on the message
     -- likely will need to forward them to the local network

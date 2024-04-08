@@ -238,20 +238,25 @@ end
 function KWLIB.strings.splitStringIntoLines(self, stringToSplit, maxWidth)
     local substrings = {}
     if stringToSplit:len() <= maxWidth then
-        substrings:insert(stringToSplit)
+        table.insert(substrings, stringToSplit)
         return substrings
     end
     local index = maxWidth
     local lastIndex = 1
     while index <= string.len(stringToSplit)  do
-        while stringToSplit:sub(index, index) ~= " " do index = index - 1 end
-        if index < lastIndex then return false end
-        substrings:insert(stringToSplit:sub(lastIndex, index))
+        while stringToSplit:sub(index, index) ~= " " do
+            index = index - 1
+            if index == lastIndex then
+                index = index + maxWidth
+                break
+            end
+        end
+        table.insert(substrings, stringToSplit:sub(lastIndex, index-1))
         lastIndex = index + 1
         index = index + maxWidth
     end
 
-    if index > stringToSplit:len() then substrings:insert(stringToSplit:sub(lastIndex, stringToSplit:len()))
+    if index > stringToSplit:len() and lastIndex <= stringToSplit:len() then table.insert(substrings, stringToSplit:sub(lastIndex, stringToSplit:len())) end
 
     return substrings
 end
@@ -362,8 +367,8 @@ KWLIB.tables = {}
 function KWLIB.tables.countEntries(self, array)
     if type(array) ~= "table" then return false end
     local count = 0
-    for a, b in pairs(table) do
-        count = count + 1
+    for a, b in pairs(array) do
+        if b ~= nil then count = count + 1 end
     end
     return count
 end
