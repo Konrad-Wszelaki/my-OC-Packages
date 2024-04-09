@@ -833,7 +833,18 @@ local function sgDialInCallback(eventID, sourceStargateID, connectingStargateAdd
     -- TODO: check if blacklist or whitelist are enabled and enforce them
     -- if blacklist/whitelist passed then
     address_locked = false
-    setTargetAddress(connectingStargateAddress)
+    for name, remoteAddress in pairs(address_list) do
+        if connectingStargateAddress == remoteAddress or connectingStargateAddress == remoteAddress:sub(1, 7) then
+            connectingStargateAddress = remoteAddress
+            break
+        end
+    end
+    if name_list[connectingStargateAddress] == nil then
+        gui:addObject("InfoBox", "addressNotFoundInfo", "slim", "ADDRESS NOT RECOGNIZED", connectingStargateAddress)
+        address_locked = true
+        return false
+    end
+    if not setTargetAddress(gui, connectingStargateAddress) then return false end
     address_locked = true
     return dialSuccessfullCallback(sourceStargateID, connectingStargateAddress)
     -- else
