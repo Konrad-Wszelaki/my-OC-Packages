@@ -306,6 +306,7 @@ end
 
 
 local function generalConfirmNo(gui, popupID)
+    if stargate_last_state == "Idle" or stargate_last_state == nil then address_locked = false end
     gui.removeObject(gui, CUSTOM_POPUP_WINDOW, popupID)
 end
 
@@ -558,7 +559,7 @@ function confirmBox.create(gui, popupMaster, confirmBoxID, yesCallback, yesCallb
 
     for i = 1, #args do
         newConfirmBox.h = newConfirmBox.h + 1
-        if string.len(args[i]) > newConfirmBox.w then
+        if string.len(args[i]) > (newConfirmBox.w - 4) then
             newConfirmBox.w = string.len(args[i]) + 4
         end
     end
@@ -713,6 +714,7 @@ end
 
 local function dialButtonCallback(...)
     if address_locked then return false end
+    address_locked = true
     local dialConfirmBox = confirmBox.create(
         gui, 
         nil,
@@ -766,7 +768,7 @@ function dialingInfoBox.create()
     newDialingInfoBox.x = 1
     newDialingInfoBox.y = 1
     newDialingInfoBox.w = 14
-    newDialingInfoBox.h = 5
+    newDialingInfoBox.h = 6
     newDialingInfoBox.popupMaster = nil
     newDialingInfoBox.onDraw = drawObject
     newDialingInfoBox.chevronEventHandlerID = newDialingInfoBox.ID .. "ChevronEventHandler"
@@ -787,24 +789,25 @@ function dialingInfoBox.create()
     end
     
     local address_name = name_list[target_address]
-    if address_name:len()   > newDialingInfoBox.w then newDialingInfoBox.w = address_name:len()     end
-    if target_address:len() > newDialingInfoBox.w then newDialingInfoBox.w = target_address:len()   end
+    if address_name:len()+2   > newDialingInfoBox.w then newDialingInfoBox.w = address_name:len()+2     end
+    if target_address:len()+2 > newDialingInfoBox.w then newDialingInfoBox.w = target_address:len()+2   end
+    newDialingInfoBox.w = newDialingInfoBox.w + (newDialingInfoBox.w % 2)
 
     -- content:
     -- name label
-    local tempObject = gui:createLabel(newDialingInfoBox.ID .. "Name", address_name, math.floor(newDialingInfoBox.w-address_name:len())/2, 1, address_name:len(), 1, "none")
+    local tempObject = gui:createLabel(newDialingInfoBox.ID .. "Name", address_name, math.ceil((newDialingInfoBox.w-address_name:len())/2), 1, address_name:len(), 1, "none")
     table.insert(newDialingInfoBox.content, tempObject)
     -- address label
-    local tempObject = gui:createLabel(newDialingInfoBox.ID .. "Address", target_address, math.floor(newDialingInfoBox.w-target_address:len())/2, 2, target_address:len(), 1, "none")
-    table.insert(newDialingInfoBox.content, tempObject)
+    --local tempObject = gui:createLabel(newDialingInfoBox.ID .. "Address", target_address, math.ceil((newDialingInfoBox.w-target_address:len())/2), 2, target_address:len(), 1, "none")
+    --table.insert(newDialingInfoBox.content, tempObject)
     -- chevrons custom field
-    local tempObject = gui:createSymbolArray(newDialingInfoBox.ID .. "Chevrons", math.floor(newDialingInfoBox.w-target_address:len())/2, 3, target_address:len(), 1)
+    local tempObject = gui:createSymbolArray(newDialingInfoBox.ID .. "Chevrons", math.ceil((newDialingInfoBox.w-target_address:len())/2), 2, target_address:len(), 1)
     table.insert(newDialingInfoBox.content, tempObject)
     -- progress custom field
-    local tempObject = gui:createSymbolArray(newDialingInfoBox.ID .. "Progress", math.floor(newDialingInfoBox.w-target_address:len())/2, 4, target_address:len(), 1)
+    local tempObject = gui:createSymbolArray(newDialingInfoBox.ID .. "Progress", math.ceil((newDialingInfoBox.w-target_address:len())/2), 3, target_address:len(), 1)
     table.insert(newDialingInfoBox.content, tempObject)
     -- disconnect button
-    local tempObject = gui:createButton(newDialingInfoBox.ID .. "Disconnect", "DISCONNECT", closeConnectionButtonCallback, math.floor(newDialingInfoBox.w/2)-5, 5, 10, 1, "none")
+    local tempObject = gui:createButton(newDialingInfoBox.ID .. "Disconnect", "DISCONNECT", closeConnectionButtonCallback, math.ceil(newDialingInfoBox.w/2)-5, 4, 12, 3, "slim")
     table.insert(newDialingInfoBox.content, tempObject)
 
     -- chevron and progress field init
