@@ -81,9 +81,9 @@ local stargate_state_safety = {
 }
 -- linked card message types
 local lk_message_types = {
-    "new_address"   = "new_address",
-    "update_success"= "update_success",
-    "update_request"= "update_request"
+    ["new_address"]    = "new_address",
+    ["update_success"] = "update_success",
+    ["update_request"] = "update_request"
 }
 -- initiated at config load
 local messageHandler --TODO: load message handler from separate file, since it will likely be different for each stargate
