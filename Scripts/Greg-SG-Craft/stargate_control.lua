@@ -1,5 +1,5 @@
-local version_major = "1"
-local version_minor = "1"
+local version_major = "2"
+local version_minor = "0"
 
 local component     = require("component")
 local io            = require("io")
@@ -39,7 +39,7 @@ io.write("version compatible...\n")
 
 local kwlib = require("KWLib")
 local KWLIB_VERSION_MAJOR = "2"
-local KWLIB_VERSION_MINOR = "1"
+local KWLIB_VERSION_MINOR = "3"
 io.write("checking KWLib version compat: ")
 if not kwlib.checkVersionCompat(kwlib, KWLIB_VERSION_MAJOR, KWLIB_VERSION_MINOR) then
     error("KWLib library version incompatible, cannot proceed...")
@@ -78,6 +78,12 @@ local stargate_state_safety = {
     Connected  = true,
     Closing    = false,
     Offline    = false
+}
+-- linked card message types
+local lk_message_types = {
+    "new_address"   = "new_address",
+    "update_success"= "update_success",
+    "update_request"= "update_request"
 }
 -- initiated at config load
 local messageHandler --TODO: load message handler from separate file, since it will likely be different for each stargate
@@ -132,7 +138,7 @@ end
 local function send_updated_address()
     if type(linked_card) ~= "table" then return false end
 
-    linked_card.send(serialization.serialize({[LOCAL_NAME] = stargate.localAddress()}))
+    linked_card.send(serialization.serialize({["TYPE"] = lk_message_types["new_address"], [LOCAL_NAME] = stargate.localAddress()}))
 end
 local function check_current_address()
     -- checking disabled, since I think it will be better if we actually send the current address every time, 1 message every 5 minutes is not that much traffic...
@@ -910,9 +916,12 @@ end
 local function lkMessageReceivedCallback(eventID, localAddress, remoteAddress, port, distance, serialized_data, ...)
     if localAddress ~= linked_card.address then return false end
     local data = serialization.unserialize(serialized_data)
-    for name, address in pairs(data) do
-        update_remote_address(name, address)
+    if data["TYPE"] == lk_message_types["new_address"] then
+        for index, value in pairs(data) do
+            if index ~= "TYPE" then update_remote_address(index, value) end
+        end
     end
+    if data["TYPE"] == net_message_types["update_request"] then return kwlib.general.updateAllPackages(kwlib, kwlib.strings.toBoolean[data["restart"]]) end
     return true
 end
 
@@ -941,7 +950,7 @@ local function sendCurrentStargateAddressThreadFunc()
             check_current_address()
             lastAddressUpdateTime = computer.uptime()
         end
-        os.sleep(1)
+        os.sleep(10)
     end
 end
 
@@ -952,7 +961,7 @@ local function saveDataFileThreadFunc()
             saveRequested = false
             lastDataSaveTime = computer.uptime()
         end
-        os.sleep(1)
+        os.sleep(10)
     end
 end
 
@@ -1016,6 +1025,19 @@ local function initializeGUI()
 
     print("done")
     return true
+end
+
+local function updatePackages(restart)
+    if restart then
+        running = false
+        if stargateAddressUpdateThread ~= nil then 
+            if not stargateAddressUpdateThread:join(5) then stargateAddressUpdateThread:kill() end
+        end
+        if saveDataFileThread ~= nil then
+            if not saveDataFileThread:join(5) then saveDataFileThread:kill() end
+        end
+    end
+    return kwlib.general.updateAllPackages(kwlib, restart)
 end
 
 -- finally, start of the script

@@ -2,6 +2,9 @@ local io            = require("io")
 local text          = require("text")
 local sides         = require("sides")
 local serialization = require("serialization")
+local filesystem    = require("filesystem")
+local shell         = require("shell")
+local computer      = require("computer")
 
 local KWLIB = {}
 
@@ -10,7 +13,7 @@ local KWLIB = {}
 -- do not use kwlib.general:createCircularBuffer(...), because then kwlib.general will be put into self instead of kwlib itself
 
 KWLIB.VERSION_MAJOR = "2"
-KWLIB.VERSION_MINOR = "1"
+KWLIB.VERSION_MINOR = "3"
 
 function KWLIB.version(self)
     return self.VERSION_MAJOR .. "." .. self.VERSION_MINOR
@@ -71,6 +74,14 @@ function KWLIB.general.createCircularBuffer(self, size)
     end
 
     return newCircularBuffer
+end
+
+-- Update All Packages
+-- A function that will call OPPM Update when available and, optionally, restart the computer
+function KWLIB.general.updateAllPackages(self, restart)
+    local success, failMsg = shell.execute("OPPM update all")
+    if success and restart then computer.shutdown(true) end
+    return success, failMsg
 end
 
 -- handling of configuration files
@@ -222,6 +233,8 @@ end
 -- strings
 KWLIB.strings = {}
 
+-- simple mapping from a string to boolean
+KWLIB.strings.toBoolean = {["true"]=true, ["false"]=false}
 
 -- function to split a given string to substrings using a given delimiter
 function KWLIB.strings.splitString(self, stringToSplit, delimiter)
@@ -371,6 +384,104 @@ function KWLIB.tables.countEntries(self, array)
         if b ~= nil then count = count + 1 end
     end
     return count
+end
+
+------------------------------------------------------------------------------------------------
+-- Items
+KWLIB.items = {}
+
+-- function to consolidate all the stacks in the input array to single entries that may exceed max stack size of each item
+-- some information is lost (damage values for tools etc.)
+-- return array is indexed by item name (the display name)
+function KWLIB.items.consolidateStackList(self, inputArray)
+    if type(inputArray) ~= "table" then return false end
+    local outputArray = {}
+    for index, itemStack in pairs(inputArray) do
+        if type(itemStack) == "table" and itemStack.label ~= nil then
+            if outputArray[itemStack.label] == nil then
+                outputArray[itemStack.label] = {}
+                outputArray[itemStack.label].size    = itemStack.size
+                outputArray[itemStack.label].maxSize = itemStack.maxSize
+                outputArray[itemStack.label].id      = itemStack.id
+                outputArray[itemStack.label].name    = itemStack.name
+                outputArray[itemStack.label].label   = itemStack.label
+            else
+                outputArray[itemStack.label].size    = outputArray[itemStack.label].size + itemStack.size
+            end
+        end
+    end
+    return outputArray
+end
+
+-- function that checks if the given inventory contains enough items to satisfy the requiredItems list
+-- will consolidate both lists before checking the condition, unless skipConsolidation is set to true
+function KWLIB.items.checkIfInventoryContainsListedItems(self, inventory, requiredItems, skipConsolidation)
+    if not skipConsolidation then
+        inventory       = self.items.consolidateStackList(self, inventory)
+        requiredItems   = self.items.consolidateStackList(self, requiredItems)
+    end
+    if type(inventory) ~= "table" or type(requiredItems) ~= "table" then return false end
+
+    for item, itemData in pairs(requiredItems) do
+        if type(inventory[item])~="table" or inventory[item].size < itemData.size then return false end
+    end
+    return true
+end
+
+------------------------------------------------------------------------------------------------
+-- Recipes
+KWLIB.recipes = {}
+
+--constants
+KWLIB.recipes.FILE_EXTENSION = ".rcp"
+KWLIB.recipes.LINE_VALUE_SEPARATOR = ";"
+
+-- reads a recipe from file
+-- path argument should be provided with no file extension
+-- recipe is formatted as an integer-indexed table, with each index corresponding to the slot in the crafting interface that needs be filled with a given item
+-- recipe files are formatted as such:
+-- 0; output Item Name; output Item Display Name; output Count; output Max Stack; output Damage
+-- 1; input Item Name slot 1; input Item Display Name slot 1; input Count slot 1; input Max Stack slot 1; input damage slot 1; not consumable slot 1
+-- 2; input Item Name slot 2; input Item Display Name slot 2; input Count slot 2; input Max Stack slot 2; input damage slot 2; not consumable slot 2
+-- ...
+--
+-- items do not need to be in order and indices can be skipped for recipes that require it
+-- returns false if any line is defined improperly
+function KWLIB.recipes.readRecipeFromFile(self, recipeFilePath)
+    if not filesystem.exists(recipeFilePath..self.recipes.FILE_EXTENSION) then return false end
+    local recipe = {}
+    recipe.input = {}
+    local recipeFile = io.open(recipeFilePath..self.recipes.FILE_EXTENSION)
+    for line in recipeFile:lines() do
+        local lineValues = self.strings.splitString(self, line, self.recipes.LINE_VALUE_SEPARATOR)
+        for index in ipairs(lineValues) do
+            lineValues[index] = string.gsub(lineValues[index], self.recipes.LINE_VALUE_SEPARATOR, " ")
+            lineValues[index] = text.trim(lineValues[index])
+        end
+        if tonumber(lineValues[1]) == 0 and #lineValues == 6 then
+            recipe.output = {}
+            recipe.output.name      = text.trim(lineValues[2])
+            recipe.output.label     = text.trim(lineValues[3])
+            recipe.output.size      = tonumber(text.trim(lineValues[4]))
+            recipe.output.maxSize   = tonumber(text.trim(lineValues[5]))
+            recipe.output.damage    = tonumber(text.trim(lineValues[6]))
+        else
+            if #lineValues == 7 then
+                local index = tonumber(lineValues[1])
+                recipe.input[index] = {}
+                recipe.input[index].name          = text.trim(lineValues[2])
+                recipe.input[index].label         = text.trim(lineValues[3])
+                recipe.input[index].size          = tonumber(text.trim(lineValues[4]))
+                recipe.input[index].maxSize       = tonumber(text.trim(lineValues[5]))
+                recipe.input[index].damage        = tonumber(text.trim(lineValues[6]))
+                recipe.input[index].nonConsumable = self.strings.toBoolean[text.trim(lineValues[7])]
+            else
+                return false
+            end
+        end
+    end
+    recipeFile:close()
+    return recipe
 end
 
 return KWLIB
