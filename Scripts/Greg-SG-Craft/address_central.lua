@@ -22,8 +22,8 @@ network_card.open(NETWORK_COMMS_PORT)
 
 -- network card message types
 local net_message_types = {
-    ["new_address"]   = "new_address",
-    ["update_request"]= "update_request"
+    "new_address"   = "new_address",
+    "update_request"= "update_request"
 }
 
 local run = true
