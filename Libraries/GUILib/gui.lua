@@ -20,7 +20,7 @@ GUI.VERSION_MAJOR = "2"
 GUI.VERSION_MINOR = "1"
 
 GUI.KWLIB_VERSION_MAJOR = "2"
-GUI.KWLIB_VERSION_MINOR = "1"
+GUI.KWLIB_VERSION_MINOR = "2"
 -- check if the KWLIB version is compatible with this library
 if kwlib:checkVersionCompat(GUI.KWLIB_VERSION_MAJOR, GUI.KWLIB_VERSION_MINOR) == false then
     error("KWLIB version is incompatible with the GUI library, cannot proceed...")
@@ -237,6 +237,192 @@ function GUI.drawBorderAndGetDimensions(self, objects, ID)
     end
 
     return x, y, w, h
+end
+
+function GUI.drawSimpleLine(self, x1, y1, x2, y2, color)
+    gpu.setForeground(color)
+    x1, x2, y1, y2 = math.floor(x1), math.floor(x2), math.floor(y1), math.floor(y2)
+    if x1 == x2 and y1 == y2 then 
+        gpu.set(x1, y1, self.symbols.SYM_full_block)
+        return true
+    end
+    if x1 == x2 then
+        if y2>y1 then
+            gpu.fill(x1, y1, 1, y2-y1, self.symbols.SYM_full_block)
+        else
+            gpu.fill(x1, y2, 1, y1-y2, self.symbols.SYM_full_block)
+        end
+        return true
+    end
+    if y1 == y2 then
+        if x2>x1 then
+            gpu.fill(x1, y1, x2-x1, 1, self.symbols.SYM_full_block)
+        else
+            gpu.fill(x2, y2, x1-x2, 1, self.symbols.SYM_full_block)
+        end
+        return true
+    end
+    local slope = math.abs(y2-y1) / math.abs(x2-x1)
+    if slope >= 1 then
+        -- x = ay+b
+        local a = (x2-x1) / (y2-y1)
+        local b = x1 - a*y1
+        local ystep = 1
+        if y2 < y1 then ystep = -1 end
+        for i=y1,y2,step do
+            gpu.set((a*i)+b, i, self.symbols.SYM_full_block)
+        end
+    else
+        -- y = ax+b
+        local a = (y2-y1) / (x2-x1)
+        local b = y1 - a*x1
+        local xstep = 1
+        if x2 < x1 then xstep = -1 end
+        for i=x1,x2,step do
+            gpu.set(i, (a*i)+b, self.symbols.SYM_full_block)
+        end
+    end
+    return true
+end
+
+function GUI.XiaolinWuLineFPart(self, val)
+    return val - math.floor(val)
+end
+
+function GUI.XiaolinWuLineRFPart(self, val)
+    return 1 - self.XiaolinWuLineFPart(self, val)
+end
+
+function GUI.drawXiaolinWuLine(self, x1, y1, x2, y2, color)
+    if x1 == x2 or y1 == y2 then 
+        return self.drawSimpleLine(self, x1, y1, x2, y2, color)
+    end
+
+    local steep = math.abs(y2-y1) > math.abs(x2-x1)
+    if steep then
+        x1, y1 = y1, x1
+        x2, y2 = y2, x2
+    end
+    if x1 > x2 then
+        x1, x2 = x2, x1
+        y1, y2 = y2, y1
+    end
+
+    local dx = x2-x1
+    local dy = y2-y1
+
+    local gradient = 0.0
+    if dx == 0 then
+        gradient = 1
+    else
+        gradient = dy/dx
+    end
+
+    -- temporary values used to get the color we want at each point
+    local dumpVal, pixelColor = "", ""
+
+    -- first endpoint
+    local xend = math.floor(x1)
+    local yend = y1 + gradient * (xend - x1)
+    local xgap = 1 - (x1 - xend)
+    local xpxl1 = xend
+    local ypxl1 = math.floor(yend)
+    if steep then
+        dumpVal, pixelColor = gpu.get(ypxl1, xpxl1)
+        pixelColor = kwlib.colors.sumColors(kwlib, pixelColor, kwlib.colors.scaleColor(kwlib, color, self.XiaolinWuLineRFPart(self, yend)*xgap))
+        gpu.setForeground(pixelColor)
+        gpu.set(ypxl1, xpxl1, self.symbols.SYM_full_block)
+        
+        dumpVal, pixelColor = gpu.get(ypxl1+1, xpxl1)
+        pixelColor = kwlib.colors.sumColors(kwlib, pixelColor, kwlib.colors.scaleColor(kwlib, color, self.XiaolinWuLineFPart(self, yend)*xgap))
+        gpu.setForeground(pixelColor)
+        gpu.set(ypxl1+1, xpxl1, self.symbols.SYM_full_block)
+    else
+        dumpVal, pixelColor = gpu.get(xpxl1, ypxl1)
+        pixelColor = kwlib.colors.sumColors(kwlib, pixelColor, kwlib.colors.scaleColor(kwlib, color, self.XiaolinWuLineRFPart(self, yend)*xgap))
+        gpu.setForeground(pixelColor)
+        gpu.set(xpxl1, ypxl1, self.symbols.SYM_full_block)
+        
+        dumpVal, pixelColor = gpu.get(xpxl1, ypxl1+1)
+        pixelColor = kwlib.colors.sumColors(kwlib, pixelColor, kwlib.colors.scaleColor(kwlib, color, self.XiaolinWuLineFPart(self, yend)*xgap))
+        gpu.setForeground(pixelColor)
+        gpu.set(xpxl1, ypxl1+1, self.symbols.SYM_full_block)
+    end
+    local intery = yend + gradient
+
+    -- second endpoint
+    xend = math.ceil(x2)
+    yend = y2 + gradient * (xend - x2)
+    xgap = 1 - (xend - x2)
+    local xpxl2 = xend
+    local ypxl2 = math.floor(yend)
+    if steep then
+        dumpVal, pixelColor = gpu.get(ypxl2, xpxl2)
+        pixelColor = kwlib.colors.sumColors(kwlib, pixelColor, kwlib.colors.scaleColor(kwlib, color, self.XiaolinWuLineRFPart(self, yend)*xgap))
+        gpu.setForeground(pixelColor)
+        gpu.set(ypxl2, xpxl2, self.symbols.SYM_full_block)
+        
+        dumpVal, pixelColor = gpu.get(ypxl2+1, xpxl2)
+        pixelColor = kwlib.colors.sumColors(kwlib, pixelColor, kwlib.colors.scaleColor(kwlib, color, self.XiaolinWuLineFPart(self, yend)*xgap))
+        gpu.setForeground(pixelColor)
+        gpu.set(ypxl2+1, xpxl2, self.symbols.SYM_full_block)
+    else
+        dumpVal, pixelColor = gpu.get(xpxl2, ypxl2)
+        pixelColor = kwlib.colors.sumColors(kwlib, pixelColor, kwlib.colors.scaleColor(kwlib, color, self.XiaolinWuLineRFPart(self, yend)*xgap))
+        gpu.setForeground(pixelColor)
+        gpu.set(xpxl2, ypxl2, self.symbols.SYM_full_block)
+        
+        dumpVal, pixelColor = gpu.get(xpxl2, ypxl2+1)
+        pixelColor = kwlib.colors.sumColors(kwlib, pixelColor, kwlib.colors.scaleColor(kwlib, color, self.XiaolinWuLineFPart(self, yend)*xgap))
+        gpu.setForeground(pixelColor)
+        gpu.set(xpxl2, ypxl2+1, self.symbols.SYM_full_block)
+    end
+
+    -- main loop
+    if steep then
+        for x=xpxl1 + 1, xpxl2-1, 1 do
+            dumpVal, pixelColor = gpu.get(math.floor(intery), x)
+            pixelColor = kwlib.colors.sumColors(kwlib, pixelColor, kwlib.colors.scaleColor(kwlib, color, self.XiaolinWuLineRFPart(self, intery)))
+            gpu.setForeground(pixelColor)
+            gpu.set(math.floor(intery), x, self.symbols.SYM_full_block)
+
+            dumpVal, pixelColor = gpu.get(math.floor(intery)+1, x)
+            pixelColor = kwlib.colors.sumColors(kwlib, pixelColor, kwlib.colors.scaleColor(kwlib, color, self.XiaolinWuLineFPart(self, intery)))
+            gpu.setForeground(pixelColor)
+            gpu.set(math.floor(intery)+1, x, self.symbols.SYM_full_block)
+
+            intery = intery + gradient
+        end
+    else
+        for x=xpxl1 + 1, xpxl2-1, 1 do
+            dumpVal, pixelColor = gpu.get(x, math.floor(intery))
+            pixelColor = kwlib.colors.sumColors(kwlib, pixelColor, kwlib.colors.scaleColor(kwlib, color, self.XiaolinWuLineRFPart(self, intery)))
+            gpu.setForeground(pixelColor)
+            gpu.set(x, math.floor(intery), self.symbols.SYM_full_block)
+
+            dumpVal, pixelColor = gpu.get(x, math.floor(intery)+1)
+            pixelColor = kwlib.colors.sumColors(kwlib, pixelColor, kwlib.colors.scaleColor(kwlib, color, self.XiaolinWuLineFPart(self, intery)))
+            gpu.setForeground(pixelColor)
+            gpu.set(x, math.floor(intery)+1, self.symbols.SYM_full_block)
+
+            intery = intery + gradient
+        end
+    end
+    return true
+end
+
+-- antialiasing options:
+-- - 0: no antialiasing
+-- - 1: Xialin Wu
+function GUI.drawLine(self, x1, y1, x2, y2, antialiasing, color, ...)
+    local antialiasing_options = {
+        0 = self.drawSimpleLine,
+        1 = self.drawXiaolinWuLine
+    }
+    if antialiasing_options[antialiasing] ~= nil then
+        return antialiasing_options[antialiasing](self, x1, y1, x2, y2, color, ...)
+    end
+    return false
 end
 
 function GUI.clearArea(self, x, y, w, h)

@@ -10,7 +10,7 @@ local KWLIB = {}
 -- do not use kwlib.general:createCircularBuffer(...), because then kwlib.general will be put into self instead of kwlib itself
 
 KWLIB.VERSION_MAJOR = "2"
-KWLIB.VERSION_MINOR = "1"
+KWLIB.VERSION_MINOR = "2"
 
 function KWLIB.version(self)
     return self.VERSION_MAJOR .. "." .. self.VERSION_MINOR
@@ -371,6 +371,61 @@ function KWLIB.tables.countEntries(self, array)
         if b ~= nil then count = count + 1 end
     end
     return count
+end
+
+------------------------------------------------------------------------------------------------
+-- colors
+
+KWLIB.colors = {}
+
+-- input: values of R G B color in range 0-255
+function KWLIB.colors.RGBToHex(self, R, G, B)
+    if R < 0 or G < 0 or B < 0 or R > 255 or G > 255 or B > 255 then return false end
+    if math.type(R) ~= "integer" or math.type(G) ~= "integer" or math.type(B) ~= "integer" then return false end
+    return "0x"..string.format("%x", R)..string.format("%x", G)..string.format("%x", B)
+end
+
+-- input: color string in format 0xRRGGBB
+function KWLIB.colors.HexToRGB(self, hexColor)
+    if string.len(hexColor) ~= 8 then return false end
+    local R = tonumber("0x"..string.sub(hexColor, 3, 4), 16)
+    local G = tonumber("0x"..string.sub(hexColor, 5, 6), 16)
+    local B = tonumber("0x"..string.sub(hexColor, 7, 8), 16)
+    return R, G, B
+end
+
+function KWLIB.colors.scaleColor(self, hexColor, scaleFactor)
+    local R, G, B = self.colors.HexToRGB(self, hexColor)
+    if R == false then return false end
+    R, G, B = math.floor(R*scaleFactor), math.floor(G*scaleFactor), math.floor(B*scaleFactor)
+    if R < 0 then R = 0 end
+    if R > 255 then R = 255 end
+
+    if G < 0 then G = 0 end
+    if G > 255 then G = 255 end
+
+    if B < 0 then B = 0 end
+    if B > 255 then B = 255 end
+
+    return self.colors.RGBToHex(self, R, G, B)
+end
+
+function KWLIB.colors.sumColors(self, hexColor1, hexColor2)
+    local R1, G1, B1 = self.colors.HexToRGB(hexColor1)
+    local R2, G2, B2 = self.colors.HexToRGB(hexColor2)
+    if R1 == false or R2 == false then return false end
+    local R, G, B = R1+R2, G1+G2, B1+B2
+    
+    if R < 0 then R = 0 end
+    if R > 255 then R = 255 end
+
+    if G < 0 then G = 0 end
+    if G > 255 then G = 255 end
+
+    if B < 0 then B = 0 end
+    if B > 255 then B = 255 end
+
+    return self.colors.RGBToHex(self, R, G, B)
 end
 
 return KWLIB
