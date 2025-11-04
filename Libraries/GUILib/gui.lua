@@ -17,7 +17,7 @@ local kwlib         = require("KWLib")
 -- actual library starts here
 local GUI = {}
 GUI.VERSION_MAJOR = "2"
-GUI.VERSION_MINOR = "1"
+GUI.VERSION_MINOR = "2"
 
 GUI.KWLIB_VERSION_MAJOR = "2"
 GUI.KWLIB_VERSION_MINOR = "2"
