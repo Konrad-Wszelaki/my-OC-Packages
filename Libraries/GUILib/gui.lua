@@ -416,8 +416,8 @@ end
 -- - 1: Xialin Wu
 function GUI.drawLine(self, x1, y1, x2, y2, antialiasing, color, ...)
     local antialiasing_options = {
-        0 = self.drawSimpleLine,
-        1 = self.drawXiaolinWuLine
+        [0] = self.drawSimpleLine,
+        [1] = self.drawXiaolinWuLine
     }
     if antialiasing_options[antialiasing] ~= nil then
         return antialiasing_options[antialiasing](self, x1, y1, x2, y2, color, ...)
