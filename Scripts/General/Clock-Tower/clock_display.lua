@@ -77,7 +77,7 @@ local function drawClockDisplay(GUI, OBJECTS, ID)
 
     --content:
     -- golden outline
-    GUI.drawCircle(GUI, x0, y0, r_outer, 1, COLOR_OUTLINE)
+    GUI.drawCircle(GUI, x0, y0, r_outer, 0, COLOR_OUTLINE)
 
     -- hour numbers display
     for i = 1, 12, 1 do
