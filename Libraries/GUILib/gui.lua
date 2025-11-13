@@ -459,9 +459,7 @@ function GUI.wuCircleDFunc(self, r, j)
 end
 
 function GUI.wuCircleD2Func(self, r, j)
-    local r2 = r * r
-    local j2 = j * j
-    return (math.floor(math.sqrt(r2 - j2)) - math.sqrt(r2 - j2)) + 0.5
+    return 1.0 - self.wuCircleDFunc(self, r, j)
 end
 
 function GUI.drawWuCircle(self, x0, y0, r, color)

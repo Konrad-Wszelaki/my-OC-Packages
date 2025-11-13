@@ -382,15 +382,25 @@ KWLIB.colors = {}
 function KWLIB.colors.RGBToHex(self, R, G, B)
     if R < 0 or G < 0 or B < 0 or R > 255 or G > 255 or B > 255 then return false end
     if math.type(R) ~= "integer" or math.type(G) ~= "integer" or math.type(B) ~= "integer" then return false end
-    return "0x"..string.format("%x", R)..string.format("%x", G)..string.format("%x", B)
+
+    R = string.format("%x", R)
+    G = string.format("%x", G)
+    B = string.format("%x", B)
+
+    if string.len(R) == 1 then R = "0"..R end
+    if string.len(G) == 1 then G = "0"..G end
+    if string.len(B) == 1 then B = "0"..B end
+
+    return R..G..B
 end
 
 -- input: color string in format 0xRRGGBB
 function KWLIB.colors.HexToRGB(self, hexColor)
+    hexColor = "0x"..string.format("%x", hexColor)
     if string.len(hexColor) ~= 8 then return false end
-    local R = tonumber("0x"..string.sub(hexColor, 3, 4), 16)
-    local G = tonumber("0x"..string.sub(hexColor, 5, 6), 16)
-    local B = tonumber("0x"..string.sub(hexColor, 7, 8), 16)
+    local R = tonumber(string.sub(hexColor, 3, 4), 16)
+    local G = tonumber(string.sub(hexColor, 5, 6), 16)
+    local B = tonumber(string.sub(hexColor, 7, 8), 16)
     return R, G, B
 end
 
@@ -407,7 +417,7 @@ function KWLIB.colors.scaleColor(self, hexColor, scaleFactor)
     if B < 0 then B = 0 end
     if B > 255 then B = 255 end
 
-    return self.colors.RGBToHex(self, R, G, B)
+    return tonumber(self.colors.RGBToHex(self, R, G, B), 16)
 end
 
 function KWLIB.colors.sumColors(self, hexColor1, hexColor2)
@@ -425,7 +435,7 @@ function KWLIB.colors.sumColors(self, hexColor1, hexColor2)
     if B < 0 then B = 0 end
     if B > 255 then B = 255 end
 
-    return self.colors.RGBToHex(self, R, G, B)
+    return tonumber(self.colors.RGBToHex(self, R, G, B), 16)
 end
 
 return KWLIB
