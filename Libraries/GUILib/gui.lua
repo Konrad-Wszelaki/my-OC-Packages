@@ -411,15 +411,24 @@ function GUI.drawLine(self, x1, y1, x2, y2, antialiasing, color, ...)
 end
 
 -- draws 8 pixels symmetrically around the centre (x0, y0) with (x,y) distances from it
+-- the drawing is stretched by a factor of 2 in the X axis due to rectangular shape of the pixels
 function GUI.simpleCircleHelperFunction(self, x0, y0, x, y)
-    gpu.set(x0 - x, y0 - y, self.symbols.SYM_full_block)
-    gpu.set(x0 - x, y0 + y, self.symbols.SYM_full_block)
-    gpu.set(x0 + x, y0 - y, self.symbols.SYM_full_block)
-    gpu.set(x0 + x, y0 + y, self.symbols.SYM_full_block)
-    gpu.set(x0 - y, y0 - x, self.symbols.SYM_full_block)
-    gpu.set(x0 - y, y0 + x, self.symbols.SYM_full_block)
-    gpu.set(x0 + y, y0 - x, self.symbols.SYM_full_block)
-    gpu.set(x0 + y, y0 + x, self.symbols.SYM_full_block)
+    gpu.set(x0 - 2*x, y0 - y, self.symbols.SYM_full_block)
+    gpu.set(x0 - 2*x - 1, y0 - y, self.symbols.SYM_full_block)
+    gpu.set(x0 - 2*x, y0 + y, self.symbols.SYM_full_block)
+    gpu.set(x0 - 2*x - 1, y0 + y, self.symbols.SYM_full_block)
+    gpu.set(x0 + 2*x, y0 - y, self.symbols.SYM_full_block)
+    gpu.set(x0 + 2*x - 1, y0 - y, self.symbols.SYM_full_block)
+    gpu.set(x0 + 2*x, y0 + y, self.symbols.SYM_full_block)
+    gpu.set(x0 + 2*x - 1, y0 + y, self.symbols.SYM_full_block)
+    gpu.set(x0 - 2*y, y0 - x, self.symbols.SYM_full_block)
+    gpu.set(x0 - 2*y - 1, y0 - x, self.symbols.SYM_full_block)
+    gpu.set(x0 - 2*y, y0 + x, self.symbols.SYM_full_block)
+    gpu.set(x0 - 2*y - 1, y0 + x, self.symbols.SYM_full_block)
+    gpu.set(x0 + 2*y, y0 - x, self.symbols.SYM_full_block)
+    gpu.set(x0 + 2*y - 1, y0 - x, self.symbols.SYM_full_block)
+    gpu.set(x0 + 2*y, y0 + x, self.symbols.SYM_full_block)
+    gpu.set(x0 + 2*y - 1, y0 + x, self.symbols.SYM_full_block)
 end
 
 -- Bresenham's Algorithm

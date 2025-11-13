@@ -58,6 +58,7 @@ local updateThread = nil
 
 local screens = {}
 local GPU_buffer_index = 0
+local screen_stretch_factor = 2
 
 
 -- clock display function
@@ -80,7 +81,7 @@ local function drawClockDisplay(GUI, OBJECTS, ID)
 
     -- hour numbers display
     for i = 1, 12, 1 do
-        local x = math.floor(x0 + r_numbers * math.cos((math.pi/6)*i - math.pi/2))
+        local x = math.floor(x0 + 2 * r_numbers * math.cos((math.pi/6)*i - math.pi/2))
         local y = math.floor(y0 + r_numbers * math.sin((math.pi/6)*i - math.pi/2))
         gpu.setForeground(COLOR_NUMBERS)
         gpu.set(x, y, tostring(i))
@@ -88,13 +89,13 @@ local function drawClockDisplay(GUI, OBJECTS, ID)
 
     -- minute hand
     local minute_hand_angle = (math.pi / 30) * OBJECTS[ID].minute - math.pi/2
-    local x = x0 + r_minute * math.cos(minute_hand_angle)
+    local x = x0 + 2 * r_minute * math.cos(minute_hand_angle)
     local y = y0 + r_minute * math.sin(minute_hand_angle)
     GUI.drawLine(GUI, x0, y0, x, y, 1, COLOR_MINUTE)
 
     -- hour hand
     local hour_hand_angle = (math.pi / 6) * OBJECTS[ID].hour + (math.pi / 6) * (OBJECTS[ID].minute / 60) - math.pi/2
-    local x = x0 + r_hour * math.cos(hour_hand_angle)
+    local x = x0 + 2 * r_hour * math.cos(hour_hand_angle)
     local y = y0 + r_hour * math.sin(hour_hand_angle)
     GUI.drawLine(GUI, x0, y0, x, y, 1, COLOR_HOUR)
 
